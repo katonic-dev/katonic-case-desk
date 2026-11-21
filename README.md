@@ -24,7 +24,8 @@ the demo are real.
   that asks the agent what a regulator has published.
 - **Shows the agent's draft** as a summary and a table of requirements, each
   marked covered, partly covered, not covered, or not found in the library,
-  with the policy clause it rests on.
+  with the policy clause it rests on. The marks are the agent's reading. The
+  officer decides.
 - **Lets the officer ask the agent** about the case, on the same session, so
   the agent has the publication and the draft in front of it.
 - **Keeps four eyes.** The person who dropped a publication in cannot decide
@@ -118,6 +119,8 @@ The desk keeps cases, sweeps and the register in one of two places:
 
 ## Security
 
+- **This is code you deploy into your own installation.** Read it, or fork
+  it, before you do.
 - **The API key speaks for its owner.** Give it the Chat scope only, plus
   Knowledge search when the desk searches the library itself. Create it as
   the identity the desk should act as.

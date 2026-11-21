@@ -3,6 +3,13 @@
 You need a Katonic installation, a model the agent can use, and, for the
 policy library, an embedding model registered in AI Gateway.
 
+To deploy from Git, App Studio must be able to reach GitHub and the npm
+registry. An installation with no outbound access cannot use that route.
+The Storage-folder route in step 4 still installs the dependencies when
+the app starts (`react` and `react-dom`, and `pg` only when you set
+`DATABASE_URL`), and it has not been run on an installation with no
+outbound access.
+
 ## 1. Build the agent
 
 1. In Studio, create an agent from a blank chat agent.
@@ -21,6 +28,22 @@ policy library, an embedding model registered in AI Gateway.
    draft in the builder is a different id and does not answer.
 
    ![The Publish agent dialog, which lists one blocker (the owner team) and the destination environment](../docs/guide/02-agent-publish.png)
+5. Check that the agent answers. This needs the key from step 3, so come
+   back to it then. Put in your installation's address, the key and the
+   published agent's id:
+
+   ```bash
+   curl -N -X POST "https://<your-installation>/public/v1/chat" \
+     -H "Authorization: Bearer <api-key>" \
+     -H "Content-Type: application/json" \
+     -H "Accept: text/event-stream" \
+     -d '{"agent_id": "<published-agent-id>", "messages": [{"role": "user", "content": "What can you do?"}], "stream": true}'
+   ```
+
+   This is the request the desk sends. The reply is streamed: it arrives as
+   `data:` lines, the text in pieces, and ends with `data: [DONE]`. An HTTP
+   error here means the address, the key or the id is wrong, and the desk
+   will fail the same way.
 
 ## 2. Load the policy library
 
@@ -39,13 +62,19 @@ Then connect the library in one of two ways:
 
 - Attach the source in the agent's Knowledge section and publish again.
 - Or set `KATONIC_LIBRARY_SOURCE_ID` to the source's id. The desk then
-  searches the library itself and hands the passages to the agent.
+  searches the library itself and puts the passages it finds inside its
+  message to the agent. That is why the agent can draft a gap analysis with
+  no library attached to it.
 
 ## 3. Create an API key
 
 Give the key the Chat scope. Add Knowledge search when you set
 `KATONIC_LIBRARY_SOURCE_ID`. The key speaks for its owner, so create it as
 the identity the desk should act as.
+
+The key reaches every agent and library its owner can reach, not only this
+one. For anything beyond a trial, a key owned by a service identity is the
+better choice, because it does not depend on one person.
 
 ![The Create API Key dialog in Developer Hub, owned by Me, with the Chat and Knowledge search scopes selected](../docs/guide/04-api-key.png)
 
@@ -56,7 +85,8 @@ dataset, name it, pick a size and choose its access.
 
 ![The Create new dataset dialog in Storage, with the name regulatory-desk-records, a size of 5 GB and private access](../docs/guide/05-storage-dataset.png)
 
-Then, in App Studio, choose New app.
+Then, in App Studio, choose New app. Give it a name that is not in use
+already.
 
 | Step | What to enter |
 |---|---|
@@ -66,6 +96,11 @@ Then, in App Studio, choose New app.
 | Attach dataset | A Storage dataset for the desk's records. Without one, the records are lost when the app restarts |
 | Health check path | `/api/health` |
 | Access | Private or Shared |
+
+The first start takes a few minutes while the dependencies install.
+
+`main` moves. To control what runs, fork the repository and deploy your own
+fork.
 
 ![The first step of Deploy a new app, with GitHub repo chosen, the repository address and the branch main](../docs/guide/06-app-source.png)
 
@@ -96,9 +131,17 @@ in a `desk-records` folder on it.
 When the app is running, open `/api/health` under the app's address. It
 should say `"records": "attached dataset"` and `"agent": "configured"`.
 
+| It says | What it means | What to do |
+|---|---|---|
+| `"agent": "not configured: set ..."` | One or more of `KATONIC_BASE_URL`, `KATONIC_API_KEY` and `KATONIC_AGENT_ID` is empty. The line names the ones that are | Set them in the app's environment variables and start the app again |
+| `"records": "local folder, lost on restart"` | No dataset is attached, and neither `DATA_DIR` nor `DATABASE_URL` is set. The desk is writing to `./data` inside the app | Attach a Storage dataset to the app, or set `DATABASE_URL`, and start the app again. Cases entered so far are not carried over |
+
 ![The desk, showing a publication, its summary and a drafted gap analysis, with the decision buttons on the right](../docs/guide/11-desk.png)
 
 ## Who is signed in
+
+Deployed from Git or from a folder as above, the desk uses the stand-in
+identity, so the register is not evidence of who decided.
 
 App Studio puts a sign-in step in front of an app that is not public and
 passes the signed-in person's email to the app in `X-Forwarded-Email`.
