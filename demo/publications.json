@@ -1,0 +1,23 @@
+{
+  "$comment": "Two real publications for the demo. Read at source on 20 November 2026. The bank they are compared against (Meridian Trust Bank) is invented.",
+  "publications": [
+    {
+      "title": "Guidelines on Artificial Intelligence Risk Management for Financial Institutions",
+      "regulator": "Monetary Authority of Singapore",
+      "published_on": "2026-10-07",
+      "link": "https://www.mas.gov.sg/regulation/guidelines/guidelines-on-artificial-intelligence-risk-management-for-financial-institutions",
+      "subject": "AI risk management",
+      "text": "Guidelines on Artificial Intelligence Risk Management, Monetary Authority of Singapore, published 7 October 2026, taking effect from 7 October 2027 in phases. They apply to all financial institutions and to all forms of AI, including generative AI and AI agents. The guidelines cover: oversight of AI by the board and senior management, who hold ultimate responsibility for AI risk management; key risk management systems and policies, including an inventory of AI systems and a materiality assessment; controls across the AI life cycle (data, development, validation, deployment, monitoring, change); and AI capability and capacity, including staff competence. Read the full text at the link before relying on any requirement.",
+      "arrived_via": "feed"
+    },
+    {
+      "title": "Policy Document on Open Finance",
+      "regulator": "Bank Negara Malaysia",
+      "published_on": "2026-11-17",
+      "link": "https://www.bnm.gov.my/-/pd-openfinance",
+      "subject": "Open finance, consent-based sharing of customer information",
+      "text": "Policy Document on Open Finance, Bank Negara Malaysia, issued and effective 17 November 2026. It establishes the regulatory framework for consent-based sharing of customer information across the financial sector through a designated open finance platform. It applies to licensed banks, licensed investment banks, licensed Islamic banks, licensed insurers, licensed takaful operators, prescribed development financial institutions and eligible e-money issuers. Requirements are phased in. Areas covered include customer consent and its withdrawal, the data to be shared and its format, participation in the designated platform, security of data sharing, and handling of customer disputes. Read the full text at the link before relying on any requirement.",
+      "arrived_via": "feed"
+    }
+  ]
+}

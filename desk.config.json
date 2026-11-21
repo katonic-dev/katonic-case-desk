@@ -1,0 +1,135 @@
+{
+  "$comment": "What makes the generic case desk the regulatory change desk. Another agent (sanctions alert review, payment investigation, ...) ships its own copy of this file and the same server and page.",
+  "desk": {
+    "id": "regulatory-change",
+    "name": "Regulatory change desk",
+    "caseNoun": "publication",
+    "caseNounPlural": "publications",
+    "draftNoun": "gap analysis",
+    "deciderRole": "compliance officer",
+    "tagline": "New publications, a drafted gap analysis for each, a place to sign, and the register afterwards."
+  },
+  "intake": {
+    "ways": [
+      "Dropped in by an officer (the form at the top of the list)",
+      "Sent by the bank's regulatory feed (POST /api/intake with X-Intake-Token)",
+      "Found by a sweep of the regulators the bank names (Sweeps, run by hand or on the workflow's schedule)"
+    ],
+    "fields": [
+      {
+        "key": "title",
+        "label": "Title",
+        "required": true
+      },
+      {
+        "key": "regulator",
+        "label": "Regulator",
+        "required": true
+      },
+      {
+        "key": "published_on",
+        "label": "Published on",
+        "required": true,
+        "type": "date"
+      },
+      {
+        "key": "link",
+        "label": "Link",
+        "required": false
+      },
+      {
+        "key": "subject",
+        "label": "Subject",
+        "required": false
+      },
+      {
+        "key": "text",
+        "label": "Text, or the passages that matter",
+        "required": false,
+        "type": "textarea"
+      }
+    ]
+  },
+  "sweeps": {
+    "regulators": [
+      {
+        "regulator": "Monetary Authority of Singapore",
+        "subject": "artificial intelligence, model risk, technology risk"
+      },
+      {
+        "regulator": "Bank Negara Malaysia",
+        "subject": "open finance, customer information, technology risk"
+      }
+    ],
+    "defaultDays": 30
+  },
+  "draft": {
+    "instruction": "A new publication has arrived at the regulatory change desk. Do two things.\n\n1. Under the heading \"Summary\", summarise it in at most six lines: who published it, when, whom it applies to, what it changes, and from when.\n\n2. Under the heading \"Draft gap analysis. For review by a compliance officer. Not issued.\", draft the gap analysis against the policy library as a Markdown table with exactly these seven columns, one row per requirement:\n| # | Requirement | Source | Policy says | Citation | Mark | Reviewer should check |\n- Requirement: the requirement in the publication's own words.\n- Source: where in the publication it comes from (section, paragraph or page).\n- Policy says: what the policy library says on it, quoted or closely paraphrased.\n- Citation: the policy document and clause the search returned.\n- Mark: exactly one of: covered, partly covered, not covered, not found.\n- Reviewer should check: what a compliance officer should verify.\nIf the publication bears on no policy in the library, write one row with the mark \"not found\" and, below the table, propose \"no action\" and say why. Write nothing after the table except that proposal.",
+    "sections": [
+      "Summary",
+      "Draft gap analysis"
+    ],
+    "marks": {
+      "covered": "Covered",
+      "partly covered": "Partly covered",
+      "not covered": "Not covered",
+      "not found": "Not found in the library"
+    }
+  },
+  "decisions": [
+    {
+      "id": "approve",
+      "label": "Approve and issue",
+      "outcome": "issued",
+      "needsNote": false
+    },
+    {
+      "id": "send_back",
+      "label": "Send back with a note",
+      "outcome": "sent_back",
+      "needsNote": true
+    },
+    {
+      "id": "no_action",
+      "label": "Close as no action",
+      "outcome": "no_action",
+      "needsNote": true
+    }
+  ],
+  "statuses": {
+    "new": "New",
+    "drafting": "Drafting",
+    "for_review": "For review",
+    "sent_back": "Sent back",
+    "issued": "Issued",
+    "no_action": "No action",
+    "removed": "Removed"
+  },
+  "register": {
+    "heading": "Every decision, including send-backs, in the order it was taken.",
+    "columns": [
+      "case_id",
+      "title",
+      "regulator",
+      "published_on",
+      "arrived_via",
+      "requested_by",
+      "draft_versions",
+      "decision",
+      "decided_by",
+      "identity_source",
+      "decided_at",
+      "note",
+      "library",
+      "agent_id",
+      "run_ids",
+      "tool_calls",
+      "platform_warning",
+      "agent_session_id"
+    ]
+  },
+  "rules": {
+    "fourEyes": true,
+    "fourEyesText": "The person who dropped a publication in cannot decide it. Any other officer can."
+  }
+}

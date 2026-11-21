@@ -1,0 +1,22 @@
+{
+  "name": "katonic-case-desk",
+  "version": "1.0.0",
+  "description": "A case desk for Katonic agents: cases in, an agent's draft, a person's decision, a register. First configuration: the regulatory change desk.",
+  "license": "Apache-2.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "seed": "node demo/seed.js"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "optionalDependencies": {
+    "pg": "8.13.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

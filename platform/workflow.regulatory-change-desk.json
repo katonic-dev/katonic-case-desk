@@ -1,0 +1,92 @@
+{
+  "$comment": "The workflow agent behind the desk, in the shape Katonic's workflow builder saves. Build it in Studio from a Blank workflow with these four steps. The agent step hands the publication to the published Regulatory Monitoring Agent; the approve step holds the run for the compliance officer group; the out step returns the result to the caller. Nothing in this repository applies it to an installation.",
+  "identity": {
+    "display_name": "Regulatory change desk (workflow)",
+    "slug": "regulatory-change-desk-workflow",
+    "description": "A publication arrives, the Regulatory Monitoring Agent drafts the gap analysis, a compliance officer approves, the result is returned."
+  },
+  "agent_type": "workflow",
+  "nodes": [
+    {
+      "id": "in",
+      "kind": "in",
+      "title": "A publication arrives",
+      "sub": "By hand, from the feed, or on the schedule",
+      "position": {
+        "x": 80,
+        "y": 200
+      },
+      "config": {
+        "source": "schedule",
+        "cron": "0 7 * * 1-5",
+        "timezone": "Asia/Singapore",
+        "$comment": "source=manual for a publication dropped in or sent by the desk; source=webhook for the bank's feed; source=schedule runs the sweep on weekday mornings. One in step takes one source: make one workflow per way in, or start with manual."
+      }
+    },
+    {
+      "id": "draft",
+      "kind": "agent",
+      "title": "Draft the gap analysis",
+      "sub": "Regulatory Monitoring Agent, with the policy library and a search tool",
+      "position": {
+        "x": 360,
+        "y": 200
+      },
+      "config": {
+        "agent_id": "<the published Regulatory Monitoring Agent's id>",
+        "display_name": "Regulatory Monitoring Agent",
+        "agent_type": "chat",
+        "message": "A new publication has arrived at the regulatory change desk. Summarise it in at most six lines, then draft the gap analysis against the policy library: for each requirement, the requirement and where it comes from, what the policy says with its citation, one of covered, partly covered, not covered or not found in the policy library, and what a reviewer should check. If it bears on no policy, propose \"no action\" and say why. Head the gap analysis \"Draft gap analysis. For review by a compliance officer. Not issued.\"\n\nTHE PUBLICATION\n{{in}}",
+        "timeout_s": 300
+      }
+    },
+    {
+      "id": "review",
+      "kind": "approve",
+      "title": "A compliance officer decides",
+      "sub": "Approve or reject; the platform records who and when",
+      "badge": "needs approval",
+      "position": {
+        "x": 640,
+        "y": 200
+      },
+      "config": {
+        "reviewer_group": "compliance-officers",
+        "channel": "email",
+        "channel_target": "",
+        "sla": "24h",
+        "on_timeout": "escalate",
+        "escalate_to": "head-of-compliance",
+        "$comment": "The platform's approve step offers approve or reject only. The desk's edit and send-back are recorded by the desk itself."
+      }
+    },
+    {
+      "id": "out",
+      "kind": "out",
+      "title": "Return the result",
+      "sub": "To the caller (the desk), which issues and files it",
+      "position": {
+        "x": 920,
+        "y": 200
+      },
+      "config": {
+        "destination": "api_response",
+        "target": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "in",
+      "to": "draft"
+    },
+    {
+      "from": "draft",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "out"
+    }
+  ]
+}
