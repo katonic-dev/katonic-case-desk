@@ -7,13 +7,20 @@ policy library, an embedding model registered in AI Gateway.
 
 1. In Studio, create an agent from a blank chat agent.
 2. Paste the text in [agent-instructions.md](agent-instructions.md) into its
-   instructions and choose a reasoning model.
+   system prompt (Setup, Behavior) and choose the Reasoning model tier.
+
+   ![The agent's Behavior page in Studio, with the instructions in the system prompt box and the Reasoning tier selected](../docs/guide/01-agent-instructions.png)
+
+   The screenshots come from a demonstration set-up with example values.
 3. Optional: attach a web search tool from Catalog, Tools. With one, a sweep
    can find what a regulator has published. Without one, the agent says it
    cannot search, and the desk still drafts a gap analysis for every
    publication you drop in.
-4. Publish the agent and copy the **published** agent's id. The id of the
+4. Publish the agent. If Publish says an owner team is required, pick the
+   team that owns the agent. Then copy the **published** agent's id. The id of the
    draft in the builder is a different id and does not answer.
+
+   ![The Publish agent dialog, which lists one blocker (the owner team) and the destination environment](../docs/guide/02-agent-publish.png)
 
 ## 2. Load the policy library
 
@@ -21,6 +28,9 @@ Use the three invented policies in `demo/policies/`, or your own.
 
 - In Knowledge, choose Connect Source, then File Upload, and add the files.
   The demo names the source "Meridian policy library (invented)".
+
+  ![The Add Knowledge Source dialog with File Upload chosen, the name Meridian policy library (invented) and the three policy files listed](../docs/guide/03-policy-library-upload.png)
+
 - Or run `node demo/upload-policies.js` from your machine. It uploads the
   three files through the API, waits for them to be indexed and prints the
   source's id. It needs a key with the Documents and knowledge:sync scopes.
@@ -37,17 +47,35 @@ Give the key the Chat scope. Add Knowledge search when you set
 `KATONIC_LIBRARY_SOURCE_ID`. The key speaks for its owner, so create it as
 the identity the desk should act as.
 
+![The Create API Key dialog in Developer Hub, owned by Me, with the Chat and Knowledge search scopes selected](../docs/guide/04-api-key.png)
+
 ## 4. Deploy the app
 
-In App Studio, choose New app.
+First create the dataset for the desk's records. In Storage, choose New
+dataset, name it, pick a size and choose its access.
+
+![The Create new dataset dialog in Storage, with the name regulatory-desk-records, a size of 5 GB and private access](../docs/guide/05-storage-dataset.png)
+
+Then, in App Studio, choose New app.
 
 | Step | What to enter |
 |---|---|
-| Source | This repository as a Git repository. Or copy the folder into a Storage dataset and choose "Deploy this folder" |
+| Source | GitHub repo, `https://github.com/katonic-dev/katonic-case-desk`, branch `main`. Or copy the folder into a Storage dataset and choose "Deploy this folder" |
 | Framework | Node/React. Leave the start command empty: App Studio runs `npm install`, then `npm start` |
+| Main file | `server.js`. App Studio proposes `index.js` for every Node app, so change it |
 | Attach dataset | A Storage dataset for the desk's records. Without one, the records are lost when the app restarts |
 | Health check path | `/api/health` |
 | Access | Private or Shared |
+
+![The first step of Deploy a new app, with GitHub repo chosen, the repository address and the branch main](../docs/guide/06-app-source.png)
+
+![The Framework step, with Node/React chosen, the main file set to server.js and the start command left empty](../docs/guide/07-app-framework.png)
+
+![The Runtime step, with the dataset attached, the health check path and the environment variables, the API key masked as a secret](../docs/guide/08-app-settings.png)
+
+![The Review step, listing the source, framework, runtime and network settings before Ship app](../docs/guide/09-app-review.png)
+
+![App Studio's list of apps, with the new desk shown as Running](../docs/guide/10-app-running.png)
 
 Environment variables:
 
@@ -67,6 +95,8 @@ in a `desk-records` folder on it.
 
 When the app is running, open `/api/health` under the app's address. It
 should say `"records": "attached dataset"` and `"agent": "configured"`.
+
+![The desk, showing a publication, its summary and a drafted gap analysis, with the decision buttons on the right](../docs/guide/11-desk.png)
 
 ## Who is signed in
 
