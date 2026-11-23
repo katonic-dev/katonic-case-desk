@@ -146,6 +146,28 @@ function rowLabel(config, key) {
 }
 
 function GapRows({ config, rows }) {
+  const rl = config.draft.rowLabels || {};
+  // A desk that labels the citation ("Evidence") gets its lines in two aligned columns.
+  if (rl.citation) {
+    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: "v" }, value));
+    return h(
+      "div",
+      { className: "gap" },
+      rows.map((r, i) =>
+        h(
+          "div",
+          { key: i, className: `gaprow ${markClass(r.mark, r.tone)}` },
+          h("div", { className: "n" }, r.n),
+          h(
+            "div",
+            null,
+            h("div", { className: "req" }, h("span", { className: "text" }, r.requirement), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
+            h("div", { className: "kvs" }, r.source ? kv("src", rl.source || "", r.source) : null, r.policy ? kv("pol", rl.policy || "", r.policy) : null, r.citation ? kv("evid", rl.citation, r.citation) : null, r.check ? kv("chk", "Check", r.check) : null),
+          ),
+        ),
+      ),
+    );
+  }
   return h(
     "div",
     { className: "gap" },
@@ -197,9 +219,14 @@ function Fields({ config, form, setForm, prefix = "f" }) {
   });
 }
 
+// A field may carry a default (intake.fields[].default) that the form starts with.
+function defaultsOf(config) {
+  return Object.fromEntries(config.intake.fields.filter((f) => f.default).map((f) => [f.key, f.default]));
+}
+
 function IntakeForm({ config, onCreated }) {
   const [open, setOpen] = React.useState(false);
-  const [form, setForm] = React.useState({});
+  const [form, setForm] = React.useState(defaultsOf(config));
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
   async function submit(e) {
@@ -208,7 +235,7 @@ function IntakeForm({ config, onCreated }) {
     setErr("");
     try {
       const c = await api("/api/cases", { method: "POST", body: JSON.stringify(form) });
-      setForm({});
+      setForm(defaultsOf(config));
       setOpen(false);
       onCreated(c);
     } catch (ex) {
@@ -340,6 +367,42 @@ function Sweeps({ config, onOpened }) {
       ),
     ),
   );
+}
+
+// The text a case came with, with light formatting where it has the patterns:
+// a line wholly in capitals is a section heading, a line that starts with a
+// clause number is a question, and a short lead-in before a colon is a label.
+// A text with none of these is shown as it is.
+function CaseText({ text }) {
+  const CAPS = /^[A-Z][A-Z0-9 ,&/'()-]{2,}$/;
+  const NUM = /^\d+(\.\d+)+\s/;
+  const LEAD = /^([A-Z][A-Za-z' ]{1,18}):\s+(.*)$/;
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  if (!lines.some((l) => CAPS.test(l.trim()) || NUM.test(l.trim()) || LEAD.test(l.trim()))) return h("p", null, text);
+  return h(
+    "div",
+    { className: "ct" },
+    lines.map((l, i) => {
+      const t = l.trim();
+      if (!t) return h("div", { key: i, className: "bl" });
+      if (CAPS.test(t)) return h("div", { key: i, className: "sec" }, t);
+      if (NUM.test(t)) return h("div", { key: i, className: "qn" }, t);
+      const m = LEAD.exec(t);
+      if (m) return h("div", { key: i, className: "ld" }, h("span", { className: "lead" }, m[1]), h("span", null, m[2]));
+      return h("div", { key: i }, t);
+    }),
+  );
+}
+
+// The decision whose proposalPrefix the agent's recommendation starts with (the longest wins).
+function proposedDecision(config, text) {
+  const t = String(text || "").trim().toLowerCase();
+  let best = null;
+  for (const d of config.decisions) {
+    const p = String(d.proposalPrefix || "").toLowerCase();
+    if (t && p && t.startsWith(p) && (!best || p.length > best.p.length)) best = { id: d.id, p };
+  }
+  return best ? best.id : "";
 }
 
 function CaseView({ config, me, c, refresh }) {
@@ -538,7 +601,7 @@ function CaseView({ config, me, c, refresh }) {
   const supplied = !twoPane
     ? null
     : c.fields[kc.showText]
-      ? [h("h3", { key: "sh" }, kc.textHeading || labelOf(config, kc.showText)), h("div", { key: "st", className: "supplied" }, h("p", null, c.fields[kc.showText]))]
+      ? [h("h3", { key: "sh" }, kc.textHeading || labelOf(config, kc.showText)), h("div", { key: "st", className: "supplied" }, h(CaseText, { text: c.fields[kc.showText] }))]
       : [h("h3", { key: "sh" }, kc.textHeading || labelOf(config, kc.showText)), h("p", { key: "st", className: "small" }, kc.noTextShown || `The desk holds no text for this ${config.desk.caseNoun}.`)];
 
   const notices = [
@@ -560,6 +623,8 @@ function CaseView({ config, me, c, refresh }) {
     // every row carries it; otherwise approving takes a reason.
     const leanApprove = c.all_pass == null ? true : c.all_pass;
     const approveNeedsReason = Boolean(config.rules.reasonToApproveUnmet && c.all_pass === false);
+    const proposedId = proposedDecision(config, c.proposal);
+    const tag = (d) => (proposedId === d.id ? h("span", { className: "proposed" }, "Agent's proposal") : null);
     const noteLabel = (d) => d.noteLabel || (d.outcome === "sent_back" ? "What the agent should change (it sees this note)" : "Note (kept in the register)");
     decisionPanel = h(
       "div",
@@ -569,10 +634,10 @@ function CaseView({ config, me, c, refresh }) {
         "div",
         { className: "actions" },
         approve
-          ? h("button", { className: `btn ${leanApprove ? "primary" : choice === approve.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => (approveNeedsReason ? setChoice(choice === approve.id ? "" : approve.id) : decide(approve)) }, busy === "approve" ? "Recording..." : approve.label)
+          ? h("button", { className: `btn ${leanApprove ? "primary" : choice === approve.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => (approveNeedsReason ? setChoice(choice === approve.id ? "" : approve.id) : decide(approve)) }, busy === approve.id ? "Recording..." : approve.label, tag(approve))
           : null,
         others.map((d) =>
-          h("button", { key: d.id, className: `btn ${choice === d.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => setChoice(choice === d.id ? "" : d.id) }, d.label),
+          h("button", { key: d.id, className: `btn ${choice === d.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => setChoice(choice === d.id ? "" : d.id) }, d.label, tag(d)),
         ),
       ),
       latest && approve && leanApprove && !chosen
@@ -735,9 +800,11 @@ function CaseView({ config, me, c, refresh }) {
       ];
 
   if (twoPane) {
+    const jump = (id) => () => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
     return [
-      h("div", { key: "source", className: "col source" }, header, supplied, chat),
-      h("div", { key: "review", className: "col review" }, notices, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
+      h("div", { key: "jump", className: "jump", role: "group", "aria-label": "Jump to" }, h("button", { className: "btn quiet", onClick: jump("pane-questionnaire") }, "Questionnaire"), h("button", { className: "btn quiet", onClick: jump("pane-assessment") }, "Assessment")),
+      h("div", { key: "source", id: "pane-questionnaire", className: "col source" }, header, supplied, chat),
+      h("div", { key: "review", id: "pane-assessment", className: "col review" }, notices, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
     ];
   }
   return [
@@ -774,7 +841,7 @@ function Register({ config, onOpen }) {
       "table",
       { className: "register" },
       h("thead", null, h("tr", null, cols.map((c) => h("th", { key: c, className: `c-${c}` }, heading(c))))),
-      h("tbody", null, rows.map((r, i) => h("tr", { key: i }, cols.map((c) => h("td", { key: c }, cell(r, c)))))),
+      h("tbody", null, rows.map((r, i) => h("tr", { key: i }, cols.map((c) => h("td", { key: c, className: `c-${c}` }, cell(r, c)))))),
     ),
     rows.length ? null : h("p", { className: "small" }, "Nothing decided yet."),
   );

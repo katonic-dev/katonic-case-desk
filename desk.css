@@ -467,7 +467,9 @@ details summary { font-size: var(--fs-sm); }
 .gaprow .pol .cite.own .lbl { margin-right: 8px; }
 .form label .hint { display: block; font-weight: 400; color: var(--t4); }
 .decide .actions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-table.register td:nth-child(2), table.register td:nth-child(3), table.register td:nth-child(6), table.register td:nth-child(8) { white-space: nowrap; }
+table.register td.c-tier, table.register td.c-received_on, table.register td.c-decided_at, table.register td.c-letter_number { white-space: nowrap; }
+table.register td.c-note { white-space: pre-line; }
+.decision-block .notice { white-space: pre-line; }
 @media (max-width: 1100px) {
   .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
 }
@@ -479,3 +481,32 @@ table.register td:nth-child(2), table.register td:nth-child(3), table.register t
 /* A long status ("Waiting for the supplier") goes to its own line instead of cutting the date. */
 .caselist .s { flex-wrap: wrap; }
 .caselist .s span:first-child { flex: none; overflow: visible; }
+
+/* Second round: aligned requirement lines, formatted case text, jump bar, proposal tag, phone header. */
+.gaprow .kvs { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 3px 10px; margin-top: 6px; }
+.gaprow .kv { display: contents; }
+.gaprow .kv .k { font-size: 12px; color: var(--t4); padding-top: 2px; }
+.gaprow .kv .v { font-size: var(--fs-md); color: var(--t2); line-height: 1.45; overflow-wrap: anywhere; }
+.gaprow .kv.src .v { font-size: var(--fs-sm); color: var(--t4); font-family: var(--mono); }
+.gaprow .kv.chk .v { color: var(--t3); }
+.gaprow .kv.chk .k { color: var(--t3); font-weight: 500; }
+.supplied .ct { font-family: var(--serif); font-size: var(--fs-read); line-height: 1.55; color: var(--t); max-width: 68ch; }
+.supplied .ct .bl { height: 6px; }
+.supplied .ct .sec { margin-top: 22px; font-family: var(--sans); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0.06em; color: var(--t3); border-bottom: 1px solid var(--rule); padding-bottom: 3px; }
+.supplied .ct .qn { margin-top: 12px; font-weight: 600; }
+.supplied .ct .ld { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 0 10px; }
+.supplied .ct .lead { font-family: var(--sans); font-size: 12px; color: var(--t4); padding-top: 4px; }
+.btn .proposed { display: block; font-size: 12px; font-weight: 400; color: var(--brand); margin-top: 1px; }
+.jump { display: none; }
+@media (max-width: 1100px) {
+  .jump { display: flex; gap: 8px; position: sticky; top: 0; z-index: 6; background: var(--s); border-bottom: 1px solid var(--line); padding: 6px 16px; }
+  .jump .btn { border-color: var(--line); color: var(--t); min-height: 36px; }
+  #pane-questionnaire, #pane-assessment { scroll-margin-top: 52px; }
+}
+@media (max-width: 600px) {
+  .masthead { height: auto; padding: 8px 16px; flex-wrap: wrap; gap: 4px 16px; }
+  .masthead .spacer { flex: 0 0 100%; height: 0; }
+  .masthead .tabs { align-self: auto; }
+  .tabs button { min-height: 32px; margin-right: 6px; }
+  .gaprow .kvs { grid-template-columns: 96px minmax(0, 1fr); }
+}
