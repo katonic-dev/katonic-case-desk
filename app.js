@@ -460,6 +460,9 @@ function CaseView({ config, me, c, refresh }) {
   const twoPane = Boolean(config.case && config.case.showText);
   const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
   const kc = config.case || {};
+  // A desk with routing shows the kind its agent was picked by, with the other details.
+  const rf = config.routing && config.routing.field;
+  const detailKeys = (kc.detailFields || []).concat(rf && !metaFields(config).includes(rf) && !(kc.detailFields || []).includes(rf) ? [rf] : []);
   const facts = (keys) => keys.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ");
   const arrivedText = `${viaLabel(config, c.arrived_via) ? `from ${viaLabel(config, c.arrived_via)}` : `via ${c.arrived_via}`}${c.arrived_via === "officer" ? `, ${viaLabel(config, "officer") ? "entered" : "dropped in"} by ${c.requested_by.email}` : ""}, ${fmt(c.created_at)}`;
 
@@ -500,11 +503,11 @@ function CaseView({ config, me, c, refresh }) {
           h(DueChip, { config, c }),
         ),
         h("p", { className: "facts" }, facts(metaFields(config))),
-        (kc.detailFields || []).some((key) => c.fields[key]) || c.fields.subject || c.fields.link
+        detailKeys.some((key) => c.fields[key]) || c.fields.subject || c.fields.link
           ? h(
               "p",
               { className: "facts" },
-              facts(kc.detailFields || []),
+              facts(detailKeys),
               c.fields.subject ? c.fields.subject : null,
               c.fields.link ? [c.fields.subject ? " · " : "", h("a", { key: "l", href: c.fields.link, target: "_blank", rel: "noreferrer", title: c.fields.link }, hostOf(c.fields.link)), h("span", { key: "o", className: "small" }, ` (opens the ${config.desk.caseNoun})`)] : null,
             )

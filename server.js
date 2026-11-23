@@ -155,6 +155,15 @@ async function createDesk(env = process.env) {
     };
   }
 
+  // The agent behind a case: the desk's own, or, on a desk with routing, the
+  // one whose id sits in the environment variable the case's kind names.
+  function agentFor(c) {
+    const route = cases.routeOf(CONFIG, c);
+    if (!route.agentEnv) return { id: agent.agentId, route };
+    const id = env[route.agentEnv] || "";
+    if (!id) throw new Error(`no agent is set for "${route.kind}": set ${route.agentEnv}`);
+    return { id, route };
+  }
   async function runDraft(c, by) {
     const statusBefore = c.status;
     c.status = "drafting";
@@ -164,6 +173,7 @@ async function createDesk(env = process.env) {
       try {
         // Where the library cannot be attached to the agent, the desk searches
         // it with its own key and hands the passages over.
+        const { id: agentId, route } = agentFor(c);
         let passages = null;
         const libraryId = env.KATONIC_LIBRARY_SOURCE_ID || "";
         if (libraryId) {
@@ -180,7 +190,7 @@ async function createDesk(env = process.env) {
           passages = cases.localPassages(CONFIG, c, docs, env.KATONIC_LIBRARY_NAME, 1);
         }
         const reply = await chatOnceMore(
-          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined },
+          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000, instruction: route.instruction }), sessionId: c.agent_session_id || undefined, id: agentId },
           async (err) => {
             const now = await store.getCase(c.id);
             now.events.push({ at: new Date().toISOString(), who: "desk", what: `the agent did not answer (${plain(err) === err.message ? err.message.slice(0, 120) : "not reached"}); trying once more` });
@@ -189,7 +199,7 @@ async function createDesk(env = process.env) {
         );
         const fresh = await store.getCase(c.id);
         cases.recordDraft(fresh, reply.content, "agent", reply.sessionId, new Date(), {
-          agent_id: agent.agentId,
+          agent_id: agentId,
           run_id: reply.runId || "",
           library: passages
             ? `${(passages[0] && passages[0].library) || env.KATONIC_LIBRARY_NAME || SHAPE.libraryNoun} (searched by the desk: ${passages.length} passages)`
@@ -399,7 +409,13 @@ async function createDesk(env = process.env) {
         const at = new Date().toISOString();
         c.conversation.push({ role: "user", by: user.email, content: message, at });
         await store.putCase(c);
-        const reply = await agent.chat({ message: cases.chatPrompt(CONFIG, c, message, Boolean(c.agent_session_id)), sessionId: c.agent_session_id || undefined });
+        let which;
+        try {
+          which = agentFor(c);
+        } catch (err) {
+          return json(res, 503, { error: err.message });
+        }
+        const reply = await agent.chat({ message: cases.chatPrompt(CONFIG, c, message, Boolean(c.agent_session_id)), sessionId: c.agent_session_id || undefined, id: which.id });
         const fresh = await store.getCase(c.id);
         if (reply.sessionId) fresh.agent_session_id = reply.sessionId;
         fresh.conversation.push({ role: "assistant", content: reply.content, at: new Date().toISOString() });
