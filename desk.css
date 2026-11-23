@@ -438,3 +438,26 @@ details summary { font-size: var(--fs-sm); }
 /* The agent's own proposal, shown under the step the desk's rules give. */
 .verdict .headline .agentline { display: block; margin-top: 4px; font-size: var(--fs-sm); color: var(--t3); }
 .verdict .headline .agentline.differs { color: var(--warn); font-weight: 500; }
+
+/* ===== Regulatory desk design review, 24 Nov 2026 ===== */
+/* Whose words each line of a row is. */
+.gaprow .lbl { display: inline-block; min-width: 76px; margin-right: 8px; font-family: var(--sans); font-size: 12px; color: var(--t4); }
+.gaprow .src { display: flex; align-items: baseline; }
+.gaprow .pol .lbl { vertical-align: baseline; }
+/* "Not found" is a possible gap, so it is not quiet. */
+.gaprow.not-found { border-left-color: var(--warn); }
+.mark.not-found { background: var(--warn-l); color: var(--warn); }
+/* A form that opens over the page. */
+.overlay { position: fixed; inset: 0; z-index: 20; background: rgba(31, 26, 20, 0.38); display: grid; place-items: start center; padding: 70px 16px 16px; overflow: auto; }
+.form.panel { width: min(520px, 100%); background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px 20px 20px; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.45); }
+.form.panel h2 { font-size: 18px; margin-bottom: 4px; }
+/* Sweeps: one line in the list column, a page of their own. */
+.sweepline { font-size: var(--fs-sm); color: var(--t3); border-top: 1px solid var(--line); margin: 18px 0 0; padding-top: 8px; }
+.col.narrowpage > div { max-width: 760px; }
+.col.narrowpage h2 { margin-bottom: 8px; }
+/* Two lines of title where the title is how a case is recognised. */
+.caselist.two-line .t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* The question box holds its example without a scrollbar. */
+.chat textarea { min-height: 92px; }
+.doclink { display: inline-flex; vertical-align: -2px; }
+.doclink .icon { margin: 0; }

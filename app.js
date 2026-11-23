@@ -54,7 +54,7 @@ function markClass(mark, tone) {
 
 function Mark({ config, mark, text, tone }) {
   const label = (config.draft.marks || {})[mark] || text || "";
-  return h("span", { className: `mark ${markClass(mark, tone)}` }, label);
+  return h("span", { className: `mark ${markClass(mark, tone)}`, title: (config.draft.markHints || {})[mark] || undefined }, label);
 }
 
 function labelOf(config, key) {
@@ -139,6 +139,12 @@ function tally(config, rows) {
 // The gap analysis as the agent wrote it: one row per requirement when it
 // wrote the table it was asked for, else the text. The parser lives on the
 // server (lib/cases.js); the page gets rows. The mark is the row's edge.
+// A small label in front of a line of a row, where the desk's config names one.
+function rowLabel(config, key) {
+  const t = (config.draft.rowLabels || {})[key];
+  return t ? h("span", { className: "lbl" }, t) : null;
+}
+
 function GapRows({ config, rows }) {
   return h(
     "div",
@@ -152,8 +158,8 @@ function GapRows({ config, rows }) {
           "div",
           null,
           h("div", { className: "req" }, h("span", { className: "text" }, r.requirement), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-          r.source ? h("div", { className: "src" }, r.source) : null,
-          h("div", { className: "pol" }, r.policy, r.citation ? h("span", { className: "cite" }, r.citation) : null),
+          r.source ? h("div", { className: "src" }, rowLabel(config, "source"), r.source) : null,
+          h("div", { className: "pol" }, rowLabel(config, "policy"), r.policy, r.citation ? h("span", { className: "cite" }, r.citation) : null),
           r.check ? h("div", { className: "chk" }, h("b", null, "Check: "), r.check) : null,
         ),
       ),
@@ -210,10 +216,13 @@ function IntakeForm({ config, onCreated }) {
       setBusy(false);
     }
   }
-  if (!open) return h("button", { className: "btn", onClick: () => setOpen(true) }, config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`);
-  return h(
+  const label = config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`;
+  const opener = h("button", { className: "btn", onClick: () => setOpen(true) }, label);
+  if (!open) return opener;
+  return h(React.Fragment, null, opener, h("div", { className: "overlay", onMouseDown: (e) => { if (e.target === e.currentTarget) setOpen(false); } }, h(
     "form",
-    { className: "form", onSubmit: submit },
+    { className: "form panel", onSubmit: submit },
+    h("h2", null, label),
     h(Fields, { config, form, setForm }),
     err ? h("div", { className: "notice bad" }, err) : null,
     h(
@@ -222,7 +231,7 @@ function IntakeForm({ config, onCreated }) {
       h("button", { className: "btn primary", type: "submit", disabled: busy }, busy ? "Adding..." : "Add and draft"),
       h("button", { className: "btn quiet", type: "button", onClick: () => setOpen(false) }, "Cancel"),
     ),
-  );
+  )));
 }
 
 // The agent answers in light Markdown. Shows bold, headings, quotes and
@@ -245,6 +254,20 @@ function Rich({ text }) {
     if ((m = line.match(/^(\s*)[-*]\s+(.*)$/))) return h(React.Fragment, { key: i }, `${m[1]}\u2022 `, inlineRich(m[2], i), nl);
     return h(React.Fragment, { key: i }, inlineRich(line, i), nl);
   });
+}
+
+// One line about sweeps for the list column; the sweeps themselves have a tab.
+function SweepLine({ onOpen }) {
+  const [last, setLast] = React.useState(undefined);
+  React.useEffect(() => {
+    api("/api/sweeps").then((s) => setLast(s[0] || null)).catch(() => setLast(null));
+  }, []);
+  return h(
+    "p",
+    { className: "sweepline" },
+    last === undefined ? "Sweeps" : last ? `Last sweep ${fmt(last.ran_at)}: ${last.error ? "failed" : `${last.found.length} found`}. ` : "No sweep has run yet. ",
+    h("button", { className: "linklike", onClick: onOpen }, "Open sweeps"),
+  );
 }
 
 function Sweeps({ config, onOpened }) {
@@ -292,7 +315,7 @@ function Sweeps({ config, onOpened }) {
   return h(
     "div",
     null,
-    h("h3", null, "Sweeps"),
+    h("h2", null, "Sweeps"),
     h("p", { className: "small" }, `Asks the agent what ${config.sweeps.regulators.map((r) => r.regulator).join(" and ")} published in the last ${config.sweeps.defaultDays} days. On the platform the workflow runs this on its schedule; here it runs when you press the button.`),
     h("button", { className: "btn quiet", onClick: run, disabled: busy }, busy ? "Sweeping..." : "Run a sweep now"),
     busy ? h("p", { className: "small", role: "status" }, `About a minute per regulator. ${progress}`) : null,
@@ -508,7 +531,11 @@ function CaseView({ config, me, c, refresh }) {
           : null,
       );
 
-  const supplied = twoPane && c.fields[kc.showText] ? [h("h3", { key: "sh" }, labelOf(config, kc.showText)), h("div", { key: "st", className: "supplied" }, h("p", null, c.fields[kc.showText]))] : null;
+  const supplied = !twoPane
+    ? null
+    : c.fields[kc.showText]
+      ? [h("h3", { key: "sh" }, kc.textHeading || labelOf(config, kc.showText)), h("div", { key: "st", className: "supplied" }, h("p", null, c.fields[kc.showText]))]
+      : [h("h3", { key: "sh" }, kc.textHeading || labelOf(config, kc.showText)), h("p", { key: "st", className: "small" }, kc.noTextShown || `The desk holds no text for this ${config.desk.caseNoun}.`)];
 
   const notices = [
     c.status === "drafting" ? h("div", { key: "n1", className: "notice plain" }, "The agent is drafting. This page refreshes on its own.") : null,
@@ -602,11 +629,11 @@ function CaseView({ config, me, c, refresh }) {
   // marks and the proposed next step. On a two-pane desk the decision sits in
   // the same strip, pinned above the rows.
   const held = Boolean(c.checklist && c.checklist.some((r) => r.blocking && r.status !== "complete"));
-  const hasVerdict = latest && !editing && (c.checklist || (rows && (c.proposal || config.draft.proposalPrefix)));
+  const hasVerdict = latest && !editing && (c.checklist || rows);
   const verdict = hasVerdict
     ? h(
         "div",
-        { className: `verdict ${held ? "held" : c.all_pass ? "ok" : "attention"}` },
+        { className: `verdict ${held ? "held" : c.all_pass === true ? "ok" : c.all_pass === false ? "attention" : "plain"}` },
         rows || c.proposal || c.next_step
           ? h(
               "div",
@@ -729,7 +756,7 @@ function Register({ config, onOpen }) {
     if (c === "title" && onOpen) return h("a", { href: "#", onClick: (e) => { e.preventDefault(); onOpen(r.case_id); } }, r[c]);
     if (c === "arrived_via") return viaLabel(config, r[c]) || r[c];
     if (config.intake.fields.some((f) => f.key === c)) return show(config, c, r[c]);
-    if (c === "decision") return h("span", null, (config.decisionLabels || {})[r[c]] || config.statuses[r[c]] || r[c], r[c] === "issued" ? [" ", h("a", { key: "l", href: `${BASE}/api/cases/${r.case_id}/issued.md` }, "document")] : null);
+    if (c === "decision") return h("span", null, (config.decisionLabels || {})[r[c]] || config.statuses[r[c]] || r[c], r[c] === "issued" ? [" ", h("a", { key: "l", className: "doclink", href: `${BASE}/api/cases/${r.case_id}/issued.md`, title: "Download the issued document", "aria-label": "Download the issued document" }, h(Icon, { name: "file" }))] : null);
     if (c === "identity_source") return r[c] === "platform-sign-in" ? "platform sign-in" : "local";
     return String(r[c] == null ? "" : r[c]);
   };
@@ -844,13 +871,15 @@ function App() {
       "header",
       { className: "masthead" },
       h("h1", null, config.desk.name),
-      h("nav", { className: "tabs", "aria-label": "Views" }, h("button", { className: tab === "desk" ? "on" : "", onClick: () => setTab("desk") }, "Desk"), h("button", { className: tab === "register" ? "on" : "", onClick: () => setTab("register") }, "Register")),
+      h("nav", { className: "tabs", "aria-label": "Views" }, h("button", { className: tab === "desk" ? "on" : "", onClick: () => setTab("desk") }, "Desk"), config.sweeps ? h("button", { className: tab === "sweeps" ? "on" : "", onClick: () => setTab("sweeps") }, "Sweeps") : null, h("button", { className: tab === "register" ? "on" : "", onClick: () => setTab("register") }, "Register")),
       h("span", { className: "spacer" }),
       health && health.agent !== "configured" ? h("span", { className: "pill warn", title: health.agent }, "agent not configured") : null,
       h(ThemeSwitch),
       h("span", { className: "me" }, h("b", null, me.name), me.source === "platform-sign-in" ? null : h("span", { className: "pill", title: "No platform sign-in in front of this desk; the name comes from a local setting" }, "demo sign-in")),
     ),
-    tab === "register"
+    tab === "sweeps" && config.sweeps
+      ? h("div", { className: "columns" }, h("div", { className: "col wide narrowpage" }, h(Sweeps, { config, onOpened: async (c) => { await refresh(); setSelected(c.id); setFilter("all"); setTab("desk"); } })))
+      : tab === "register"
       ? h("div", { className: "columns" }, h(Register, { config, onOpen: (id) => { setSelected(id); setFilter("all"); setTab("desk"); } }))
       : h(
           "div",
@@ -862,9 +891,9 @@ function App() {
             h("h3", null, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
             h("input", { className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
             h("div", { className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
-            h("ul", { className: "caselist" }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => setSelected(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
+            h("ul", { className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => setSelected(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
             shown.length ? h("p", { className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
-            config.sweeps ? h(Sweeps, { config, onOpened: async (c) => { await refresh(); setSelected(c.id); } }) : null,
+            config.sweeps ? h(SweepLine, { onOpen: () => setTab("sweeps") }) : null,
             h("p", { className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
           ),
           current ? h(CaseView, { key: current.id, config, me, c: current, refresh }) : h("div", { className: "col blank" }, h("div", { className: "emptystate" }, h(Icon, { name: "inbox" }), h("p", null, list.length ? `Pick a ${config.desk.caseNoun} on the left.` : `No ${config.desk.caseNounPlural} on the desk yet.`), h("p", { className: "small" }, list.length ? "Its details and the agent's review open here." : `${config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`}, or wait for one to arrive.`))),

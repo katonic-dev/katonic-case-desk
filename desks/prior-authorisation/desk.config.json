@@ -161,6 +161,10 @@
         "ask": "ask the provider for more information",
         "refer": "refer to the medical director"
       }
+    },
+    "rowLabels": {
+      "source": "Policy",
+      "policy": "The request"
     }
   },
   "decisions": [
