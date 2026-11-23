@@ -325,8 +325,8 @@ h3 .version { font-weight: 400; color: var(--t4); }
 .redo { display: none; }
 
 /* Rows: colour on the edge only where a row needs attention. */
-.gaprow { border-left-width: 1px; padding: 12px 14px 12px 12px; }
-.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.not-found { border-left-width: 4px; }
+.gaprow { border-left-width: 1px; padding: 12px 14px 12px 15px; }
+.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.not-found { border-left-width: 4px; padding-left: 12px; }
 .gaprow.tone-ok, .gaprow.covered { border-left-color: var(--line); }
 .gaprow .req .text { font-size: var(--fs-read); }
 .gaprow .src, .gaprow .chk { font-size: var(--fs-sm); }
