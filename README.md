@@ -91,6 +91,78 @@ sanctions alert review, complaint handling or payment investigation. Only the
 regulatory change configuration ships today, and the sweep feature still
 speaks of regulators in the code.
 
+## Settings folders kept outside the repository
+
+A desk is a settings folder. It does not have to live in this repository. A
+folder anywhere on the laptop or the server will do.
+
+**Where the desk is.** Set `DESK_CONFIG` to the full path of the folder's
+`desk.config.json`, for example
+`C:\desks\third-party-risk\desk.config.json`. A relative path is read from
+this folder. The demo cases named in the settings are read from the same
+folder.
+
+**Where its policy library is.** Set `DESK_LIBRARY_DIR` to a folder of
+Markdown files. Use a full path here too. The desk hands the agent the files
+that best match each case.
+
+**Replies for the stand-in.** The stand-in platform (`demo/fake-platform.js`)
+answers with canned text. A settings folder can carry its own canned replies in
+a file `demo-replies.json`, beside `desk.config.json`:
+
+```json
+{
+  "replies": {
+    "Larkspur": "Summary\n...the full reply, table and last line...",
+    "tessaly": "..."
+  },
+  "default": "optional reply for any other case"
+}
+```
+
+Each key is a distinctive part of a case's title. Case does not matter. The
+value is the full reply the stand-in gives for a draft request about that case.
+Write it in the shape the desk expects, so the table and the last line are read
+as marks. The stand-in adds its own first line saying that the reply is canned.
+Start the stand-in with the same `DESK_CONFIG` as the desk:
+
+```bash
+DESK_CONFIG=C:/desks/third-party-risk/desk.config.json node demo/fake-platform.js
+```
+
+With no file, or with no `DESK_CONFIG`, the stand-in answers as it always did.
+
+**One key file for many desks.** The desk reads `KATONIC_BASE_URL`,
+`KATONIC_API_KEY` and `KATONIC_AGENT_ID`. A file named by `DESK_ENV_FILE`
+overrides the process environment, key by key. If two desks share one key file,
+set `DESK_AGENT_ID` in the process environment of each. It is the agent the
+desk calls, whatever `KATONIC_AGENT_ID` says in any file. A file cannot
+override it. Nothing else about the order changes.
+
+**Several agents behind one desk.** Add an optional `routing` key to
+`desk.config.json`. It picks the agent and the drafting instruction by the
+value of one intake field:
+
+```json
+"routing": {
+  "field": "kind",
+  "kinds": {
+    "Application pack": { "agentEnv": "PACK_AGENT_ID", "instruction": "Check the application pack..." },
+    "Credit memo": { "agentEnv": "MEMO_AGENT_ID", "instruction": "Draft a credit memo..." }
+  }
+}
+```
+
+`field` is the key of an intake field. Each kind names the environment
+variable that holds the agent id to call, and the instruction to use in place
+of `draft.instruction`. Either can be left out. The table shape and the marks
+stay the desk's own. A case whose value is not in the map uses the desk's agent
+and instruction. If a kind names a variable that is empty, the draft fails with
+a message that says which one to set. Questions about a case go to the same
+agent that drafted it. The page shows the kind with the case's other details.
+With no `routing` key nothing changes. The stand-in does not know about agents:
+its replies come from `demo-replies.json`.
+
 ## What is real and what is a stand-in
 
 | Piece | State |
