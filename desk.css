@@ -510,3 +510,8 @@ table.register td.c-note { white-space: pre-line; }
   .tabs button { min-height: 32px; margin-right: 6px; }
   .gaprow .kvs { grid-template-columns: 96px minmax(0, 1fr); }
 }
+@media (max-width: 600px) {
+  .masthead { gap: 4px 10px; }
+  .themeswitch button { padding: 2px 8px; }
+  .masthead .me { gap: 6px; }
+}
