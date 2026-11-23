@@ -7,7 +7,8 @@
     "caseNounPlural": "publications",
     "draftNoun": "gap analysis",
     "deciderRole": "compliance officer",
-    "tagline": "New publications, a drafted gap analysis for each, a place to sign, and the register afterwards."
+    "tagline": "New publications, a drafted gap analysis for each, a place to sign, and the register afterwards.",
+    "addLabel": "Add a publication"
   },
   "intake": {
     "ways": [
@@ -73,13 +74,20 @@
       "covered": "Covered",
       "partly covered": "Partly covered",
       "not covered": "Not covered",
-      "not found": "Not found in the library"
+      "not found": "Not found"
+    },
+    "rowLabels": {
+      "source": "Publication",
+      "policy": "Our policy"
+    },
+    "markHints": {
+      "not found": "Not found in the policy library"
     }
   },
   "decisions": [
     {
       "id": "approve",
-      "label": "Approve and issue",
+      "label": "Issue the gap analysis",
       "outcome": "issued",
       "needsNote": false
     },
@@ -87,13 +95,15 @@
       "id": "send_back",
       "label": "Send back with a note",
       "outcome": "sent_back",
-      "needsNote": true
+      "needsNote": true,
+      "noteLabel": "What the agent should change (it sees this note)"
     },
     {
       "id": "no_action",
       "label": "Close as no action",
       "outcome": "no_action",
-      "needsNote": true
+      "needsNote": true,
+      "noteLabel": "Why no action is needed"
     }
   ],
   "statuses": {
@@ -126,10 +136,42 @@
       "tool_calls",
       "platform_warning",
       "agent_session_id"
-    ]
+    ],
+    "screenColumns": [
+      "title",
+      "regulator",
+      "published_on",
+      "decision",
+      "decided_by",
+      "decided_at",
+      "note",
+      "draft_versions"
+    ],
+    "labels": {
+      "title": "Publication",
+      "regulator": "Regulator",
+      "published_on": "Published",
+      "decision": "Decision",
+      "decided_by": "Decided by",
+      "decided_at": "Decided at",
+      "note": "Note",
+      "draft_versions": "Versions"
+    }
   },
   "rules": {
     "fourEyes": true,
     "fourEyesText": "The person who dropped a publication in cannot decide it. Any other officer can."
+  },
+  "case": {
+    "showText": "text",
+    "textHeading": "The publication, as the desk holds it",
+    "noTextShown": "The desk holds no text for this publication. Open it at its link above.",
+    "listTitleLines": 2
+  },
+  "decisionLabels": {
+    "issued": "Issued",
+    "no_action": "Closed as no action",
+    "sent_back": "Sent back to the agent",
+    "removed": "Removed from the desk"
   }
 }

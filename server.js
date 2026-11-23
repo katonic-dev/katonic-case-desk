@@ -16,7 +16,17 @@ const { readIdentity } = require("./lib/identity");
 const { createAgentClient } = require("./lib/agent");
 const cases = require("./lib/cases");
 
-const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "desk.config.json"), "utf8"));
+// Which desk this is. DESK_CONFIG names another desk's config file (a path
+// from this folder, for example desks/prior-authorisation/desk.config.json);
+// without it the desk is the regulatory change desk.
+function loadConfig(env) {
+  const file = path.resolve(__dirname, (env && env.DESK_CONFIG) || "desk.config.json");
+  const config = JSON.parse(fs.readFileSync(file, "utf8"));
+  Object.defineProperty(config, "__dir", { value: path.dirname(file), enumerable: false });
+  return config;
+}
+
+const DEFAULT_CONFIG = loadConfig({});
 
 const FILES = {
   "/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
@@ -25,13 +35,14 @@ const FILES = {
   "/vendor/react-dom.js": { file: "node_modules/react-dom/umd/react-dom.production.min.js", type: "text/javascript; charset=utf-8" },
 };
 
-function page(base) {
+function page(base, name) {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${CONFIG.desk.name}</title>
+<title>${name}</title>
+<script>try{var t=localStorage.getItem("desk-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <link rel="stylesheet" href="${base}/desk.css">
 </head>
 <body>
@@ -86,7 +97,15 @@ function csv(rows, columns) {
 
 // Builds the desk around a store and an agent client, so a test can hand it
 // a temporary folder and a fake agent.
+// The demo cases a desk ships with: config.demo names the file (beside the
+// config) and the key that holds the list.
+function demoCases(config) {
+  const d = config.demo || { file: "demo/publications.json", key: "publications" };
+  return JSON.parse(fs.readFileSync(path.resolve(config.__dir, d.file), "utf8"))[d.key];
+}
+
 async function createDesk(env = process.env) {
+  const CONFIG = loadConfig(env);
   const store = await openStore(env);
   const agent = createAgentClient(env);
   const base = String(env.PUBLIC_URL || "").replace(/\/+$/, "");
@@ -95,13 +114,45 @@ async function createDesk(env = process.env) {
   function who(req) {
     return readIdentity(req.headers, env);
   }
+  const SHAPE = cases.shape(CONFIG);
+  // A failure that is worth one more try: the agent was not reached, the
+  // platform asked for another attempt, or the reply came back empty.
+  function transient(err) {
+    return /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|try again|HTTP 5\d\d|HTTP 429|empty reply/i.test(String(err && err.message));
+  }
+  async function chatOnceMore(args, onRetry) {
+    try {
+      const reply = await agent.chat(args);
+      if (!String(reply.content || "").trim()) throw new Error("empty reply");
+      return reply;
+    } catch (err) {
+      if (!transient(err)) throw err;
+      if (onRetry) await onRetry(err);
+      await new Promise((r) => setTimeout(r, Number(env.DESK_RETRY_WAIT_MS) || 2500));
+      return agent.chat(args);
+    }
+  }
+  function plain(err) {
+    return /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|socket hang up|network/i.test(String(err && err.message))
+      ? "The agent could not be reached. Try again in a moment. If it keeps failing, tell your administrator."
+      : err.message;
+  }
 
   // A case as the page sees it: with the latest draft's gap table parsed into
   // rows and its summary picked out, so the page shows a table when there is
   // one and the text when there is not.
   function caseOut(c) {
     const latest = c.drafts.length ? c.drafts[c.drafts.length - 1] : null;
-    return { ...c, gap_rows: latest ? cases.parseGapTable(latest.text) : null, summary: latest ? cases.summaryOf(latest.text).split("**").join("") : "" };
+    return {
+      ...c,
+      gap_rows: latest ? cases.parseGapTable(latest.text, CONFIG) : null,
+      summary: latest ? cases.summaryOf(latest.text, CONFIG).split("**").join("") : "",
+      proposal: latest ? cases.proposalOf(latest.text, CONFIG) : "",
+      checklist: latest ? cases.parseChecklist(latest.text, CONFIG) : null,
+      next_step: latest ? cases.derivedProposal(latest.text, CONFIG) : null,
+      gate_note: latest ? cases.gateNote(latest.text, CONFIG) : "",
+      all_pass: latest ? cases.allPass(latest.text, CONFIG) : null,
+    };
   }
 
   async function runDraft(c, by) {
@@ -117,18 +168,31 @@ async function createDesk(env = process.env) {
         const libraryId = env.KATONIC_LIBRARY_SOURCE_ID || "";
         if (libraryId) {
           const seen = new Map();
-          for (const q of cases.libraryQueries(c)) {
+          for (const q of cases.libraryQueries(CONFIG, c)) {
             for (const p of await agent.search({ query: q, sourceIds: [libraryId], topK: 8 })) if (p.text && !seen.has(p.text)) seen.set(p.text, p);
           }
           passages = [...seen.values()].slice(0, 40);
+        } else if (env.DESK_LIBRARY_DIR) {
+          // No knowledge source on the platform: the library is a folder of
+          // Markdown files beside the desk.
+          const dir = path.resolve(__dirname, env.DESK_LIBRARY_DIR);
+          const docs = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !/^readme/i.test(f)).map((f) => ({ name: f.replace(/\.md$/, ""), text: fs.readFileSync(path.join(dir, f), "utf8") }));
+          passages = cases.localPassages(CONFIG, c, docs, env.KATONIC_LIBRARY_NAME, 1);
         }
-        const reply = await agent.chat({ message: cases.draftPrompt(CONFIG, c, passages, { sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined });
+        const reply = await chatOnceMore(
+          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined },
+          async (err) => {
+            const now = await store.getCase(c.id);
+            now.events.push({ at: new Date().toISOString(), who: "desk", what: `the agent did not answer (${plain(err) === err.message ? err.message.slice(0, 120) : "not reached"}); trying once more` });
+            await store.putCase(now);
+          },
+        );
         const fresh = await store.getCase(c.id);
         cases.recordDraft(fresh, reply.content, "agent", reply.sessionId, new Date(), {
           agent_id: agent.agentId,
           run_id: reply.runId || "",
           library: passages
-            ? `${(passages[0] && passages[0].library) || env.KATONIC_LIBRARY_NAME || "policy library"} (searched by the desk: ${passages.length} passages)`
+            ? `${(passages[0] && passages[0].library) || env.KATONIC_LIBRARY_NAME || SHAPE.libraryNoun} (searched by the desk: ${passages.length} passages)`
             : env.KATONIC_LIBRARY_NAME || "",
           tools: reply.tools || [],
           warning: reply.warning || "",
@@ -140,8 +204,8 @@ async function createDesk(env = process.env) {
         // A failed draft changes nothing: a sent-back case stays sent back, so
         // the draft that was rejected cannot be approved.
         fresh.status = statusBefore === "drafting" ? (fresh.drafts.length ? "for_review" : "new") : statusBefore;
-        fresh.last_error = err.message;
-        fresh.events.push({ at: new Date().toISOString(), who: "agent", what: `draft failed: ${err.message}` });
+        fresh.last_error = plain(err);
+        fresh.events.push({ at: new Date().toISOString(), who: "agent", what: `draft failed: ${plain(err)}${plain(err) === err.message ? "" : ` (${err.message})`}` });
         await store.putCase(fresh);
       } finally {
         drafting.delete(c.id);
@@ -193,7 +257,16 @@ async function createDesk(env = process.env) {
     };
     let p;
     try {
-      if (route === "/" || route === "") return send(res, 200, "text/html; charset=utf-8", page(base));
+      if (route === "/" || route === "") return send(res, 200, "text/html; charset=utf-8", page(base, CONFIG.desk.name));
+      // The typefaces, from the @fontsource packages: /fonts/<family>/<file>.woff2
+      const font = /^\/fonts\/(dm-sans|source-serif-4|jetbrains-mono)\/([a-z0-9-]+\.woff2)$/.exec(route);
+      if (font) {
+        return fs.readFile(path.join(__dirname, "node_modules", "@fontsource", font[1], "files", font[2]), (err, data) => {
+          if (err) return send(res, 404, "text/plain", "Not found");
+          res.writeHead(200, { "Content-Type": "font/woff2", "Cache-Control": "public, max-age=31536000, immutable" });
+          res.end(data);
+        });
+      }
       if (FILES[route]) {
         const f = FILES[route];
         return fs.readFile(path.join(__dirname, f.file), (err, data) =>
@@ -265,6 +338,7 @@ async function createDesk(env = process.env) {
           return json(res, 409, { error: err.message });
         }
         await store.putCase(c);
+        if (CONFIG.register.recordRemovals) await store.appendRegister(cases.removalEntry(CONFIG, c, who(req), body.note));
         return json(res, 200, caseOut(c));
       }
 
@@ -272,10 +346,28 @@ async function createDesk(env = process.env) {
         const c = await store.getCase(p[0]);
         if (!c) return json(res, 404, { error: "no such case" });
         if (!agent.configured()) return json(res, 503, { error: `the agent is not configured: set ${agent.missing().join(", ")}` });
-        if (["issued", "no_action", "removed"].includes(c.status)) return json(res, 409, { error: "this case is closed" });
+        if (SHAPE.closed.includes(c.status)) return json(res, 409, { error: "this case is closed" });
+        if (SHAPE.waiting.includes(c.status)) return json(res, 409, { error: `this ${CONFIG.desk.caseNoun} is waiting for a reply; add the reply to draft again` });
         if (drafting.has(c.id)) return json(res, 202, { id: c.id, status: "drafting" });
         runDraft(c, who(req).email);
         return json(res, 202, { id: c.id, status: "drafting" });
+      }
+
+      // A reply from outside (the provider, on the prior authorisation desk)
+      // is added to a case that was waiting for it, and the agent drafts again.
+      if ((p = m("POST", /^\/api\/cases\/([^/]+)\/reply$/))) {
+        const c = await store.getCase(p[0]);
+        if (!c) return json(res, 404, { error: "no such case" });
+        const body = await readBody(req);
+        const user = who(req);
+        try {
+          cases.addReply(CONFIG, c, body.text, user);
+        } catch (err) {
+          return json(res, 409, { error: err.message });
+        }
+        await store.putCase(c);
+        if (agent.configured()) runDraft(c, user.email);
+        return json(res, 200, caseOut(await store.getCase(c.id)));
       }
 
       if ((p = m("POST", /^\/api\/cases\/([^/]+)\/decision$/))) {
@@ -289,9 +381,10 @@ async function createDesk(env = process.env) {
         } catch (err) {
           return json(res, 409, { error: err.message });
         }
-        if (entry.decision === "issued") c.issued_document = cases.issuedDocument(CONFIG, c);
+        if ((CONFIG.audit && CONFIG.audit.outcomes ? CONFIG.audit.outcomes : ["issued"]).includes(entry.decision)) c.issued_document = cases.issuedDocument(CONFIG, c);
         await store.putCase(c);
         await store.appendRegister(entry);
+        if (entry.decision === "sent_back" && CONFIG.rules.redraftOnSendBack && agent.configured()) runDraft(c, user.email);
         return json(res, 200, caseOut(c));
       }
 
@@ -315,6 +408,7 @@ async function createDesk(env = process.env) {
       }
 
       // Sweeps: ask the agent what a regulator published.
+      if (!CONFIG.sweeps && route.startsWith("/api/sweeps")) return json(res, 404, { error: "this desk has no sweeps" });
       if (m("GET", /^\/api\/sweeps$/)) return json(res, 200, await store.listSweeps());
       if (m("GET", /^\/api\/sweeps\/status$/)) return json(res, 200, sweepRun);
       if (m("POST", /^\/api\/sweeps$/)) {
@@ -369,6 +463,13 @@ async function createDesk(env = process.env) {
         res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=register.csv" });
         return res.end(csv(rows, CONFIG.register.columns));
       }
+      if ((p = m("GET", /^\/api\/cases\/([^/]+)\/letters\/(\d+)\.md$/))) {
+        const c = await store.getCase(p[0]);
+        const letter = c && (c.letters || [])[Number(p[1])];
+        if (!letter) return json(res, 404, { error: "no such letter" });
+        res.writeHead(200, { "Content-Type": "text/markdown; charset=utf-8", "Content-Disposition": `attachment; filename=${letter.number}.md` });
+        return res.end(letter.text);
+      }
       if ((p = m("GET", /^\/api\/cases\/([^/]+)\/issued\.md$/))) {
         const c = await store.getCase(p[0]);
         if (!c || !c.issued_document) return json(res, 404, { error: "nothing issued for this case" });
@@ -378,7 +479,7 @@ async function createDesk(env = process.env) {
       if (query.has("x")) return json(res, 400, { error: "unknown query" });
       return json(res, 404, { error: "not found" });
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return json(res, 500, { error: plain(err) });
     }
   }
 
@@ -386,13 +487,12 @@ async function createDesk(env = process.env) {
   // that arrived from the feed, so a freshly deployed desk is not empty.
   if (String(env.SEED_DEMO || "").toLowerCase() === "true" && (await store.listCases()).length === 0) {
     try {
-      const { publications } = JSON.parse(fs.readFileSync(path.join(__dirname, "demo", "publications.json"), "utf8"));
-      for (const p of publications) {
+      for (const p of demoCases(CONFIG)) {
         const { errors, fields } = cases.validateIntake(CONFIG, p);
         if (!errors.length) await createCase(fields, null, p.arrived_via || "feed", false);
       }
     } catch (err) {
-      console.error("could not seed the demo publications:", err.message);
+      console.error("could not seed the demo cases:", err.message);
     }
   }
 
@@ -401,8 +501,11 @@ async function createDesk(env = process.env) {
 }
 
 if (require.main === module) {
-  if (fs.existsSync(path.join(__dirname, ".env"))) {
-    for (const line of fs.readFileSync(path.join(__dirname, ".env"), "utf8").split(/\r?\n/)) {
+  // DESK_ENV_FILE names another settings file, so one checkout can run
+  // against more than one platform.
+  const envFile = process.env.DESK_ENV_FILE || path.join(__dirname, ".env");
+  if (fs.existsSync(envFile)) {
+    for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
       const mm = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
       if (mm) process.env[mm[1]] = mm[2].replace(/^"|"$/g, ""); // the desk's .env wins over an ambient key in the shell
     }
@@ -410,9 +513,9 @@ if (require.main === module) {
   const PORT = Number(process.env.PORT || 3000);
   createDesk(process.env).then((desk) => {
     desk.server.listen(PORT, "0.0.0.0", () =>
-      console.log(`${CONFIG.desk.name}: listening on ${PORT}, served under "${process.env.PUBLIC_URL || "/"}", records in ${desk.store.kind}, agent ${desk.agent.configured() ? "configured" : "NOT configured (" + desk.agent.missing().join(", ") + ")"}`),
+      console.log(`${desk.config.desk.name}: listening on ${PORT}, served under "${process.env.PUBLIC_URL || "/"}", records in ${desk.store.kind}, agent ${desk.agent.configured() ? "configured" : "NOT configured (" + desk.agent.missing().join(", ") + ")"}`),
     );
   });
 }
 
-module.exports = { createDesk, CONFIG };
+module.exports = { createDesk, CONFIG: DEFAULT_CONFIG, loadConfig, demoCases };

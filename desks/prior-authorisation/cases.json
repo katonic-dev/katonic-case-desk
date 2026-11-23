@@ -1,0 +1,49 @@
+{
+  "$comment": "Four invented prior authorisation requests for the demo. Harbourline Health Plan, its members and these clinics do not exist. The clinical details were written for the demo and are not clinical guidance. The fourth request's clinical information is adapted from the sample case in Microsoft's Prior Authorization Multi-Agent Solution Accelerator (MIT licence, see NOTICE): the patient's name, date of birth, provider number and insurance number were removed and the dates were moved.",
+  "requests": [
+    {
+      "title": "MRI of the lumbar spine without contrast",
+      "member_ref": "H-204817",
+      "provider": "Dr A. Okafor, Quayside Family Practice (invented)",
+      "requested_on": "2026-11-16",
+      "service_code": "72148",
+      "diagnosis": "Low back pain with left leg pain",
+      "urgency": "Standard",
+      "text": "Referral note, 14 November 2026. Adult member with low back pain radiating to the left leg for about seven weeks. Seen 28 September 2026: advised to stay active, started ibuprofen 400 mg three times a day. Physiotherapy started 12 October 2026; the physiotherapist's letter of 13 November records five weekly sessions attended with little change. Examination on 14 November: straight leg raise positive on the left at 40 degrees, ankle reflex reduced on the left, power normal. No bladder or bowel symptoms reported. Request: MRI of the lumbar spine to plan a possible referral to the spine service.",
+      "arrived_via": "feed"
+    },
+    {
+      "title": "Continuous glucose monitor, sensors and reader",
+      "member_ref": "H-118302",
+      "provider": "Dr M. Lindqvist, Harbour Diabetes Clinic (invented)",
+      "requested_on": "2026-11-18",
+      "service_code": "E2103, A4239",
+      "diagnosis": "Type 2 diabetes, treated with insulin",
+      "urgency": "Standard",
+      "text": "Clinic letter, 17 November 2026. Member with type 2 diabetes for eleven years. Current treatment: insulin glargine once a day and insulin aspart with each meal (four injections a day) since March 2025. Tests capillary glucose four or more times a day; meter download for the last 30 days attached, average 5.1 tests a day. HbA1c 8.9% on 3 November 2026. Two episodes of low glucose below 3.0 mmol/L in the last three months, one at night. Attended the clinic's structured diabetes education course, completed 22 June 2026. Seen in clinic in person on 17 November 2026. Request: continuous glucose monitor to adjust insulin doses and reduce low glucose at night.",
+      "arrived_via": "feed"
+    },
+    {
+      "title": "Adalimumab biosimilar 40 mg every two weeks",
+      "member_ref": "H-330951",
+      "provider": "Dr S. Rahman, Northbank Rheumatology (invented)",
+      "requested_on": "2026-11-19",
+      "service_code": "J0135 (biosimilar)",
+      "diagnosis": "Rheumatoid arthritis, seropositive",
+      "urgency": "Standard",
+      "text": "Specialist letter, 18 November 2026. Member with seropositive rheumatoid arthritis diagnosed in February 2026. Methotrexate started 2 March 2026, raised to 20 mg a week by May, with folic acid. After three months at 20 mg a week the disease activity score (DAS28) on 10 November 2026 was 5.4, with eight swollen joints. Methotrexate continues. Request: adalimumab biosimilar 40 mg by injection every two weeks, added to methotrexate.",
+      "arrived_via": "feed"
+    },
+    {
+      "title": "Bronchoscopy with transbronchial lung biopsy",
+      "member_ref": "H-415227",
+      "provider": "Dr L. Moreau, Eastgate Chest Clinic (invented)",
+      "requested_on": "2026-11-21",
+      "service_code": "31628",
+      "diagnosis": "Solitary pulmonary nodule (R91.1)",
+      "urgency": "Expedited",
+      "text": "68-year-old member presenting with a persistent right lower lobe pulmonary nodule. CT chest (15 October 2026) demonstrates a 1.8 cm spiculated nodule in the right lower lobe, increased from 1.2 cm on prior CT (12 July 2026), consistent with interval growth over 3 months. PET/CT (22 October 2026) shows FDG avidity with SUV max of 4.2, concerning for malignancy.\n\nPast history: COPD (mild, GOLD stage I), hypertension, hyperlipidaemia. 40 pack-year smoking history, quit 5 years ago. No prior history of malignancy. Family history significant for lung cancer (father, age 72). Medicines: salbutamol inhaler as needed, lisinopril 10 mg daily, atorvastatin 20 mg daily. No known drug allergies.\n\nExamination: BP 132/78, HR 76, RR 16, SpO2 95% on room air. Decreased breath sounds at the right base; no wheeze or crackles. Remainder of examination unremarkable.\n\nBloods (20 October 2026): WBC 9.2, Hb 14.1 g/dL, platelets 245, INR 1.0, creatinine 0.9 mg/dL. Metabolic panel within normal limits.\n\nPulmonary function tests (18 October 2026): FEV1 78% predicted, FVC 82% predicted, FEV1/FVC ratio 0.73, DLCO 71% predicted. Member is an acceptable candidate for the procedure.\n\nThe member completed a 14-day course of amoxicillin-clavulanate with no resolution of the nodule. Given the spiculated morphology, interval growth, FDG avidity (SUV 4.2) and significant smoking history, there is high suspicion for primary lung malignancy. Recommend transbronchial lung biopsy (31628) for tissue diagnosis. Risks including pneumothorax and bleeding were discussed; the member consents to proceed.",
+      "arrived_via": "feed"
+    }
+  ]
+}
