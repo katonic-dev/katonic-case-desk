@@ -500,16 +500,24 @@ async function createDesk(env = process.env) {
   return { server, store, agent, config: CONFIG, drafting, close: async () => { server.close(); await store.close(); } };
 }
 
+// Reads a settings file into env. The file wins over an ambient key in the
+// shell, key by key, except DESK_AGENT_ID: when that is set in the process
+// environment before the file is read, it stays, so one key file can serve
+// several desks that each name their own agent.
+function loadEnvFile(envFile, env) {
+  if (!fs.existsSync(envFile)) return;
+  const pinned = env.DESK_AGENT_ID;
+  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
+    const mm = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (mm) env[mm[1]] = mm[2].replace(/^"|"$/g, ""); // the desk's .env wins over an ambient key in the shell
+  }
+  if (pinned) env.DESK_AGENT_ID = pinned;
+}
+
 if (require.main === module) {
   // DESK_ENV_FILE names another settings file, so one checkout can run
   // against more than one platform.
-  const envFile = process.env.DESK_ENV_FILE || path.join(__dirname, ".env");
-  if (fs.existsSync(envFile)) {
-    for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
-      const mm = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-      if (mm) process.env[mm[1]] = mm[2].replace(/^"|"$/g, ""); // the desk's .env wins over an ambient key in the shell
-    }
-  }
+  loadEnvFile(process.env.DESK_ENV_FILE || path.join(__dirname, ".env"), process.env);
   const PORT = Number(process.env.PORT || 3000);
   createDesk(process.env).then((desk) => {
     desk.server.listen(PORT, "0.0.0.0", () =>
@@ -518,4 +526,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createDesk, CONFIG: DEFAULT_CONFIG, loadConfig, demoCases };
+module.exports = { createDesk, loadEnvFile, CONFIG: DEFAULT_CONFIG, loadConfig, demoCases };
