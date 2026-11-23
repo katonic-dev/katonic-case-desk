@@ -390,3 +390,72 @@ test("when the desk's own search finds no policy, the agent is told the library 
   assert.ok(told.includes("returned nothing for this request"));
   assert.ok(!cases.draftPrompt(CONFIG, c, null).includes("returned nothing"));
 });
+
+test("the next step follows the marks by fixed rules, whatever the agent's own line says", () => {
+  const head = "Summary\nX.\n\nDraft criteria review. For review by a clinical reviewer. Not issued.\n\n| # | Criterion | Policy source | Evidence in the request | Where | Mark | Reviewer should check |\n|---|---|---|---|---|---|---|\n";
+  const row = (n, mark) => `| ${n} | C${n} | P ${n} | E | W | ${mark} | check |\n`;
+  const say = (line) => `\nProposed next step: ${line}`;
+  const allMet = head + row(1, "met") + row(2, "met");
+  assert.equal(cases.derivedProposal(allMet + say("approve, every criterion is met"), CONFIG).kind, "approve");
+  // the agent says approve although a row is only partly met: the rules do not
+  const lax = cases.derivedProposal(head + row(1, "met") + row(2, "partly met") + say("approve, every criterion is met"), CONFIG);
+  assert.equal(lax.kind, "ask");
+  assert.equal(lax.agrees, false);
+  assert.match(lax.why, /criterion 2/);
+  // the agent says ask although a row is not met: the rules refer
+  const soft = cases.derivedProposal(head + row(1, "not met") + row(2, "not documented") + say("ask the provider for more information: 1. x"), CONFIG);
+  assert.equal(soft.kind, "refer");
+  assert.equal(soft.agrees, false);
+  // an open required item asks, even with every criterion met
+  const open = cases.derivedProposal(CHECK + allMet + say("approve, every criterion is met"), CONFIG);
+  assert.equal(open.kind, "ask");
+  assert.match(open.why, /Clinical information of substance/);
+  // the same marks give the same step every time
+  const a = cases.derivedProposal(head + row(1, "met") + row(2, "not documented") + say("ask the provider for more information: 1. x"), CONFIG);
+  const b = cases.derivedProposal(head + row(1, "met") + row(2, "not documented") + say("refer to the medical director"), CONFIG);
+  assert.equal(a.kind, b.kind);
+  assert.equal(a.agrees, true);
+  assert.equal(b.agrees, false);
+});
+
+test("on the running desk: a draft that fails once is tried once more, and the history says so", async () => {
+  let calls = 0;
+  const platform = await new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (d) => (raw += d));
+      req.on("end", () => {
+        calls += 1;
+        if (calls === 1) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ code: "FORBIDDEN", detail: "We couldn't verify your access to this agent. Try again in a moment." }));
+        }
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`data: ${JSON.stringify({ type: "RUN_STARTED", thread_id: "sess-t", run_id: "run-t" })}\n\n`);
+        for (const piece of TABLE.match(/.{1,60}/gs)) res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", delta: piece })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+      });
+    });
+    server.listen(0, "127.0.0.1", () => resolve({ server, url: `http://127.0.0.1:${server.address().port}` }));
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pa-desk-"));
+  const desk = await createDesk({ DESK_CONFIG: "desks/prior-authorisation/desk.config.json", DATA_DIR: dir, SEED_DEMO: "true", DESK_RETRY_WAIT_MS: "50", KATONIC_BASE_URL: platform.url, KATONIC_API_KEY: "kapi_test", KATONIC_AGENT_ID: "agent-pa", LOCAL_USER: nurse.email, LOCAL_USER_NAME: nurse.name });
+  await new Promise((resolve) => desk.server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${desk.server.address().port}`;
+  try {
+    const list = await (await fetch(base + "/api/cases")).json();
+    await fetch(`${base}/api/cases/${list[0].id}/draft`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    await desk.drafting.get(list[0].id);
+    const c = await (await fetch(`${base}/api/cases/${list[0].id}`)).json();
+    assert.equal(calls, 2);
+    assert.equal(c.status, "for_review");
+    assert.equal(c.last_error, "");
+    assert.ok(c.events.some((e) => /trying once more/.test(e.what)));
+    assert.equal(c.next_step.kind, "refer", "TABLE has a row marked not met");
+  } finally {
+    await desk.close();
+    platform.server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

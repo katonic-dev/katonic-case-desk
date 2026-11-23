@@ -40,6 +40,7 @@ Find the policy that covers the service or medicine requested, in the passages y
 - For each one, find what the clinical information in the request says. Quote it or paraphrase it closely, and say where in the request it is.
 - Mark each criterion as exactly one of: met, partly met, not met, not documented.
 - "not documented" means the request is silent. "not met" means the request shows the opposite of what the criterion asks.
+- A criterion is "met" only when the request states the fact outright. If you have to infer it (for example a practice's name suggesting the clinician's specialty, or "seen in clinic" suggesting who saw the member and what was assessed), mark it "partly met" and say exactly what the request would need to state.
 - A shortfall the provider could cure is not "not met". Where a criterion falls short only because a record, a date or a count is incomplete (for example five weeks recorded where six are required), mark it "partly met" and propose asking the provider for exactly what is missing. Keep "not met" and referral to the medical director for a request that shows the criterion cannot be met, such as a diagnosis the policy does not cover or a finding that rules the criterion out.
 
 ## Output

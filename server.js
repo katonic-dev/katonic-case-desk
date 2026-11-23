@@ -115,6 +115,23 @@ async function createDesk(env = process.env) {
     return readIdentity(req.headers, env);
   }
   const SHAPE = cases.shape(CONFIG);
+  // A failure that is worth one more try: the agent was not reached, the
+  // platform asked for another attempt, or the reply came back empty.
+  function transient(err) {
+    return /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|try again|HTTP 5\d\d|HTTP 429|empty reply/i.test(String(err && err.message));
+  }
+  async function chatOnceMore(args, onRetry) {
+    try {
+      const reply = await agent.chat(args);
+      if (!String(reply.content || "").trim()) throw new Error("empty reply");
+      return reply;
+    } catch (err) {
+      if (!transient(err)) throw err;
+      if (onRetry) await onRetry(err);
+      await new Promise((r) => setTimeout(r, Number(env.DESK_RETRY_WAIT_MS) || 2500));
+      return agent.chat(args);
+    }
+  }
   function plain(err) {
     return /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|socket hang up|network/i.test(String(err && err.message))
       ? "The agent could not be reached. Try again in a moment. If it keeps failing, tell your administrator."
@@ -132,6 +149,7 @@ async function createDesk(env = process.env) {
       summary: latest ? cases.summaryOf(latest.text, CONFIG).split("**").join("") : "",
       proposal: latest ? cases.proposalOf(latest.text, CONFIG) : "",
       checklist: latest ? cases.parseChecklist(latest.text, CONFIG) : null,
+      next_step: latest ? cases.derivedProposal(latest.text, CONFIG) : null,
       gate_note: latest ? cases.gateNote(latest.text, CONFIG) : "",
       all_pass: latest ? cases.allPass(latest.text, CONFIG) : null,
     };
@@ -161,7 +179,14 @@ async function createDesk(env = process.env) {
           const docs = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !/^readme/i.test(f)).map((f) => ({ name: f.replace(/\.md$/, ""), text: fs.readFileSync(path.join(dir, f), "utf8") }));
           passages = cases.localPassages(CONFIG, c, docs, env.KATONIC_LIBRARY_NAME, 1);
         }
-        const reply = await agent.chat({ message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined });
+        const reply = await chatOnceMore(
+          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined },
+          async (err) => {
+            const now = await store.getCase(c.id);
+            now.events.push({ at: new Date().toISOString(), who: "desk", what: `the agent did not answer (${plain(err) === err.message ? err.message.slice(0, 120) : "not reached"}); trying once more` });
+            await store.putCase(now);
+          },
+        );
         const fresh = await store.getCase(c.id);
         cases.recordDraft(fresh, reply.content, "agent", reply.sessionId, new Date(), {
           agent_id: agent.agentId,

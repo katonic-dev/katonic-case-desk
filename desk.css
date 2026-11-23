@@ -434,3 +434,7 @@ details summary { font-size: var(--fs-sm); }
 .filters { gap: 4px; }
 .filters button { padding: 2px 8px; }
 .filters button b { margin-left: 4px; }
+
+/* The agent's own proposal, shown under the step the desk's rules give. */
+.verdict .headline .agentline { display: block; margin-top: 4px; font-size: var(--fs-sm); color: var(--t3); }
+.verdict .headline .agentline.differs { color: var(--warn); font-weight: 500; }

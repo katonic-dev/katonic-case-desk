@@ -607,12 +607,23 @@ function CaseView({ config, me, c, refresh }) {
     ? h(
         "div",
         { className: `verdict ${held ? "held" : c.all_pass ? "ok" : "attention"}` },
-        rows || c.proposal
+        rows || c.proposal || c.next_step
           ? h(
               "div",
               { className: "headline" },
               rows ? h("span", { className: "tally" }, tally(config, rows)) : null,
-              c.proposal ? h("span", null, h("b", null, "The agent proposes: "), c.proposal) : config.draft.proposalPrefix ? h("span", { className: "small" }, "The agent proposed no next step.") : null,
+              c.next_step
+                ? [
+                    h("span", { key: "ns" }, h("b", null, "Next step by the desk's rules: "), `${c.next_step.label}, because ${c.next_step.why}.`),
+                    c.next_step.agentText
+                      ? h("span", { key: "ag", className: `agentline ${c.next_step.agrees ? "" : "differs"}` }, c.next_step.agrees ? "The agent's words: " : "The agent proposed something else: ", c.next_step.agentText)
+                      : null,
+                  ]
+                : c.proposal
+                  ? h("span", null, h("b", null, "The agent proposes: "), c.proposal)
+                  : config.draft.proposalPrefix
+                    ? h("span", { className: "small" }, "The agent proposed no next step.")
+                    : null,
             )
           : null,
         c.checklist ? h(Checklist, { rows: c.checklist }) : null,
