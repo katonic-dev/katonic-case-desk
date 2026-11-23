@@ -159,7 +159,7 @@ function GapRows({ config, rows }) {
           null,
           h("div", { className: "req" }, h("span", { className: "text" }, r.requirement), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
           r.source ? h("div", { className: "src" }, rowLabel(config, "source"), r.source) : null,
-          h("div", { className: "pol" }, rowLabel(config, "policy"), r.policy, r.citation ? h("span", { className: "cite" }, r.citation) : null),
+          h("div", { className: "pol" }, rowLabel(config, "policy"), r.policy, r.citation ? h("span", { className: rowLabel(config, "citation") ? "cite own" : "cite" }, rowLabel(config, "citation"), r.citation) : null),
           r.check ? h("div", { className: "chk" }, h("b", null, "Check: "), r.check) : null,
         ),
       ),
@@ -189,6 +189,7 @@ function Fields({ config, form, setForm, prefix = "f" }) {
       "label",
       { key: f.key, htmlFor: id },
       f.label + (f.required ? "" : " (optional)"),
+      f.hint ? h("span", { className: "hint" }, f.hint) : null,
       f.type === "textarea"
         ? h("textarea", { id, name: f.key, value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) })
         : h("input", { id, name: f.key, type: f.type === "date" ? "date" : "text", value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) }),
@@ -551,9 +552,10 @@ function CaseView({ config, me, c, refresh }) {
   let decisionPanel;
   if (open) {
     const chosen = config.decisions.find((d) => d.id === choice) || null;
-    const approve = config.decisions.find((d) => d.id === "approve");
+    // The desk's approving decision is the one called "approve" or, failing that, the one whose outcome is "issued".
+    const approve = config.decisions.find((d) => d.id === "approve") || config.decisions.find((d) => d.outcome === "issued");
     const redo = config.decisions.filter((d) => d.outcome === "sent_back");
-    const others = config.decisions.filter((d) => d.id !== "approve" && d.outcome !== "sent_back");
+    const others = config.decisions.filter((d) => d !== approve && d.outcome !== "sent_back");
     // Where the desk has a pass mark, Approve is the filled button only when
     // every row carries it; otherwise approving takes a reason.
     const leanApprove = c.all_pass == null ? true : c.all_pass;
@@ -580,7 +582,7 @@ function CaseView({ config, me, c, refresh }) {
         ? h(
             "form",
             { className: "form", onSubmit: (e) => { e.preventDefault(); decide(chosen); } },
-            h("label", { htmlFor: "decision-note" }, chosen.id === "approve" ? config.rules.reasonToApproveUnmetLabel || "Why you are approving although a row is not met" : noteLabel(chosen), h("textarea", { id: "decision-note", value: note, autoFocus: true, onChange: (e) => setNote(e.target.value) })),
+            h("label", { htmlFor: "decision-note" }, approve && chosen.id === approve.id ? config.rules.reasonToApproveUnmetLabel || "Why you are approving although a row is not met" : noteLabel(chosen), h("textarea", { id: "decision-note", value: note, autoFocus: true, onChange: (e) => setNote(e.target.value) })),
             chosen.noteHint ? h("p", { className: "small" }, chosen.noteHint) : null,
             h("div", { className: "row" }, h("button", { className: "btn primary", type: "submit", disabled: Boolean(busy) || !note.trim() }, busy === chosen.id ? "Recording..." : chosen.label), h("button", { className: "btn quiet", type: "button", onClick: () => setChoice("") }, "Cancel")),
           )
@@ -681,7 +683,7 @@ function CaseView({ config, me, c, refresh }) {
           : c.checklist
             ? h("div", { key: "gate", className: "card" }, h("p", { className: "summary" }, c.gate_note || "The review stopped before the criteria were checked."))
             : h("div", { key: "prose", className: "draft" }, latest.text)
-      : h("div", { key: "none", className: "empty" }, c.status === "drafting" ? "Waiting for the agent..." : "No draft yet."),
+      : twoPane && c.status !== "drafting" ? null : h("div", { key: "none", className: "empty" }, c.status === "drafting" ? "Waiting for the agent..." : "No draft yet."),
     latest && open
       ? h("p", { key: "ver", className: "small" }, edited ? "You have edited the draft. Your version is recorded when you decide." : `Version ${latest.version} was written by ${latest.by === "agent" ? "the agent" : latest.by} at ${fmt(latest.at)}${latest.library ? `, against ${latest.library}` : ""}. Edit it if you need to; the register keeps every version.`)
       : null,

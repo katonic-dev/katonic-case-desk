@@ -461,3 +461,13 @@ details summary { font-size: var(--fs-sm); }
 .chat textarea { min-height: 92px; }
 .doclink { display: inline-flex; vertical-align: -2px; }
 .doclink .icon { margin: 0; }
+
+/* Third-party risk desk design review, 24 Nov 2026 */
+.gaprow .pol .cite.own { display: block; margin: 3px 0 0; font-family: var(--sans); font-size: var(--fs-md); color: var(--t2); overflow-wrap: anywhere; }
+.gaprow .pol .cite.own .lbl { margin-right: 8px; }
+.form label .hint { display: block; font-weight: 400; color: var(--t4); }
+.decide .actions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+table.register td:nth-child(2), table.register td:nth-child(3), table.register td:nth-child(6), table.register td:nth-child(8) { white-space: nowrap; }
+@media (max-width: 1100px) {
+  .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
+}

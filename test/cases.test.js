@@ -215,3 +215,12 @@ test("the issued document says who wrote each version: a redo is the agent's, an
   assert.ok(doc.includes(`${second.email} edited version 3.`));
   assert.ok(!doc.includes("later versions by the officer"));
 });
+
+test("a desk can name who the issued document says it was issued by, with desk.issuedVerb", () => {
+  const c = dropped();
+  cases.recordDraft(c, "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: covered.", "agent", "s");
+  cases.applyDecision(CONFIG, c, "approve", second, "", null);
+  assert.ok(cases.issuedDocument(CONFIG, c).includes("Issued by b.officer@example.invalid"));
+  const own = { ...CONFIG, desk: { ...CONFIG.desk, issuedVerb: "Recommended for approval by" } };
+  assert.ok(cases.issuedDocument(own, c).includes("Recommended for approval by b.officer@example.invalid"));
+});
