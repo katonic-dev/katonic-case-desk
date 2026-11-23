@@ -8,3 +8,15 @@ demo/policies/ and its people are invented. The two regulatory publications
 in demo/publications.json are real and belong to their publishers; only
 their titles, dates, links and a short description in our own words are
 included.
+
+The prior authorisation desk (desks/prior-authorisation/) adapts ideas and
+some content from Microsoft's Prior Authorization Multi-Agent Solution
+Accelerator (https://github.com/microsoft/Prior-Authorization-Multi-Agent-Solution-Accelerator),
+Copyright (c) Microsoft Corporation, MIT licence: the completeness checklist,
+the order of the gates, the shape of the agent's instructions, the sections of
+the audit record, the two letters to the provider, and the clinical narrative
+of the fourth demo request. No code from that project is included. The MIT
+licence text is in desks/prior-authorisation/THIRD-PARTY-LICENCE-MIT.txt.
+
+Harbourline Health Plan, its coverage policies, its members and its clinics
+are invented. Nothing in desks/prior-authorisation/ is clinical guidance.

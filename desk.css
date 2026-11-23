@@ -1,3 +1,11 @@
+/* The typefaces ship with the desk (the @fontsource packages), as they do with the platform. */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/dm-sans/dm-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/dm-sans/dm-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/dm-sans/dm-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/source-serif-4/source-serif-4-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/source-serif-4/source-serif-4-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+
 /* The desk's look: a room of Studio. Values follow the platform's token file
    (apps/web/src/styles/tokens.css): its families, its purple, its warm page
    with white cards, its 12-13 px UI scale and its radii. The font files ship
@@ -104,9 +112,9 @@ h2 .chip { margin-left: 8px; font-family: var(--sans); font-weight: 500; positio
 .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 
 /* The case. */
-.meta { font-size: var(--fs-base); color: var(--t2); margin: 6px 0 0; }
-.meta dt { float: left; clear: left; width: 84px; color: var(--t4); }
-.meta dd { margin: 0 0 2px 84px; }
+.meta { font-size: var(--fs-base); color: var(--t2); margin: 6px 0 0; display: grid; grid-template-columns: minmax(84px, max-content) minmax(0, 1fr); gap: 2px 12px; }
+.meta dt { color: var(--t4); max-width: 190px; }
+.meta dd { margin: 0; }
 .card { background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 12px 14px; }
 .summary { font-family: var(--serif); font-size: var(--fs-read); line-height: 1.5; margin: 0; white-space: pre-wrap; }
 .draft { font-family: var(--serif); font-size: var(--fs-read); line-height: 1.55; white-space: pre-wrap; background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; min-height: 120px; }
@@ -124,6 +132,10 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .gaprow.partly-covered { border-left-color: var(--warn); }
 .gaprow.not-covered { border-left-color: var(--err); }
 .gaprow.not-found { border-left-color: var(--t4); }
+.gaprow.tone-ok { border-left-color: var(--ok); }
+.gaprow.tone-warn { border-left-color: var(--warn); }
+.gaprow.tone-err { border-left-color: var(--err); }
+.gaprow.tone-none { border-left-color: var(--t4); }
 .gaprow .n { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t4); padding-top: 3px; }
 .gaprow .req { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .gaprow > div { min-width: 0; }
@@ -138,6 +150,10 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .mark.partly-covered { background: var(--warn-l); color: var(--warn); }
 .mark.not-covered { background: var(--err-l); color: var(--err); }
 .mark.not-found { background: var(--rule); color: var(--t4); }
+.mark.tone-ok { background: var(--ok-l); color: var(--ok); }
+.mark.tone-warn { background: var(--warn-l); color: var(--warn); }
+.mark.tone-err { background: var(--err-l); color: var(--err); }
+.mark.tone-none { background: var(--rule); color: var(--t4); }
 
 /* The timeline. */
 .events { font-size: var(--fs-base); color: var(--t2); list-style: none; padding: 0; margin: 0; }
@@ -174,3 +190,247 @@ details summary:hover { color: var(--t); }
   .col { overflow: visible; border-right: none; border-bottom: 1px solid var(--line); }
   table.register { display: block; overflow-x: auto; }
 }
+
+.supplied { margin: 10px 0; background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; }
+.supplied summary { cursor: pointer; font-size: var(--fs-sm); color: var(--t3); }
+.supplied p { margin: 8px 0 2px; font-family: var(--serif); font-size: var(--fs-read); line-height: 1.5; color: var(--t); white-space: pre-wrap; }
+
+/* The agent's proposed next step and the count of marks, above the rows. */
+.proposal { background: var(--s); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: var(--r-lg); padding: 10px 12px; margin: 0 0 10px; font-size: var(--fs-md); color: var(--t2); line-height: 1.45; }
+.proposal.ok { border-left-color: var(--ok); }
+.proposal .tally { font-size: var(--fs-sm); color: var(--t4); margin-bottom: 3px; }
+.proposal b { font-weight: 600; color: var(--t); }
+/* A citation is a reference, not a link: it does not open anything yet. */
+.gaprow .pol .cite { color: var(--t3); }
+/* Each mark carries a sign as well as a colour. */
+.mark.tone-ok::before, .mark.covered::before { content: "\2713\00a0"; }
+.mark.tone-warn::before, .mark.partly-covered::before { content: "\25D0\00a0"; }
+.mark.tone-err::before, .mark.not-covered::before { content: "\2715\00a0"; }
+.mark.tone-none::before, .mark.not-found::before { content: "?\00a0"; }
+/* Chips beside a case's title and on its line in the list. */
+.chip.plain { background: var(--rule); color: var(--t3); }
+.chip.due { background: var(--rule); color: var(--t3); }
+.chip.warn, .chip.due.warn { background: var(--warn-l); color: var(--warn); }
+.chip.due.err { background: var(--err-l); color: var(--err); }
+h2 .chip { margin-left: 8px; vertical-align: middle; }
+/* The text a case came with stays in reach while the review is read. */
+.supplied { position: sticky; top: -14px; z-index: 2; max-height: 34vh; overflow: auto; box-shadow: 0 6px 10px -8px rgba(0, 0, 0, 0.25); }
+.btn.outline { background: var(--s); border: 1px solid var(--line); color: var(--t); }
+.redo { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
+.register th.c-title, .register td:first-child { min-width: 220px; }
+.register th { white-space: nowrap; }
+
+/* The completeness check, above the agent's proposal. */
+.checklist { background: var(--s); border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: var(--r-lg); padding: 10px 12px; margin: 0 0 8px; font-size: var(--fs-md); color: var(--t2); line-height: 1.5; }
+.checklist.held { border-left-color: var(--err); }
+.checklist b { font-weight: 600; color: var(--t); }
+.checklist .item { margin-top: 4px; font-size: var(--fs-base); }
+.checklist details { margin-top: 4px; }
+.checklist summary { cursor: pointer; font-size: var(--fs-sm); color: var(--t4); }
+
+/* ===== Visual design review, 23 Nov 2026 =====
+   One thing leads on each screen; type large enough for a desk used all day;
+   each colour means one thing. These rules follow the earlier ones and win. */
+
+/* The page follows the system theme, scrollbars and form controls included. */
+:root { color-scheme: light dark; }
+
+/* Type scale: 13 px is the smallest, 14 px is the interface, 16 px is read. */
+:root {
+  --fs-sm: 13px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-read: 16px;
+  --t3: #5a5148;
+  --t4: #6a6055;
+  --pin: rgba(31, 26, 20, 0.14);
+}
+html, body { font-size: var(--fs-md); }
+.masthead { height: 50px; }
+h2 { font-size: 22px; line-height: 1.25; margin: 0; letter-spacing: -0.01em; }
+h3 { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--t); font-weight: 600; margin: 22px 0 8px; }
+h3 .version { font-weight: 400; color: var(--t4); }
+.small { font-size: var(--fs-sm); color: var(--t4); }
+.icon { flex: none; vertical-align: -2px; margin-right: 5px; }
+
+/* Layout. A desk that shows the text a case came with gives it its own pane. */
+.columns { grid-template-columns: 300px minmax(0, 1fr) 340px; }
+.columns.two { grid-template-columns: 290px minmax(0, 1fr) minmax(0, 1.2fr); }
+.col { padding: 18px 20px 28px; }
+.col.list { padding: 14px 14px 24px; }
+.col.review { background: var(--bg); padding-top: 0; }
+.col.review > h3:first-of-type { margin-top: 18px; }
+.col.source { background: var(--s); }
+.col.blank { grid-column: 2 / -1; display: grid; place-items: center; }
+.emptystate { text-align: center; color: var(--t3); max-width: 320px; }
+.emptystate .icon { width: 34px; height: 34px; margin: 0 0 6px; color: var(--t4); }
+.emptystate p { margin: 2px 0; }
+
+/* The head of a case: its title, one status, the facts in two lines. */
+.casehead { margin-bottom: 6px; }
+.titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.statusline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 10px; font-size: var(--fs-sm); color: var(--t3); }
+.statusline .fact.urgent { color: var(--err); font-weight: 600; }
+.due { display: inline-flex; align-items: center; color: var(--t3); font-size: var(--fs-sm); white-space: nowrap; }
+.due.warn { color: var(--t); font-weight: 500; }
+.due.err { color: var(--err); font-weight: 600; }
+.facts { margin: 2px 0; font-size: var(--fs-md); color: var(--t2); }
+.facts + .facts { color: var(--t3); }
+.more { margin-top: 6px; }
+.more .meta { margin-top: 8px; font-size: var(--fs-sm); }
+.menu { position: relative; flex: none; }
+.menu summary { list-style: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--s); font-size: 18px; line-height: 1; color: var(--t3); }
+.menu summary::-webkit-details-marker { display: none; }
+.menu[open] summary { border-color: var(--t4); color: var(--t); }
+.menu-items { position: absolute; right: 0; top: 34px; z-index: 5; display: flex; flex-direction: column; min-width: 200px; padding: 4px; background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 8px 24px -10px var(--pin); }
+.menu-items .btn { text-align: left; }
+
+/* The text a case came with: a heading and a page to read, not a box in a stack. */
+.supplied { position: static; max-height: none; overflow: visible; box-shadow: none; border: none; border-radius: 0; padding: 0; margin: 0; background: transparent; }
+.supplied p { margin: 0; font-size: var(--fs-read); line-height: 1.6; max-width: 68ch; }
+
+/* The verdict: what the agent found and proposes, and the decision, in one
+   strip that stays in reach above the rows. */
+.verdict { position: sticky; top: 0; z-index: 3; background: var(--s); border: 1px solid var(--line); border-top: 3px solid var(--t4); border-radius: 0 0 var(--r-lg) var(--r-lg); padding: 12px 14px 12px; margin: 0 -6px 14px; box-shadow: 0 10px 18px -14px var(--pin); }
+.verdict.ok { border-top-color: var(--ok); }
+.verdict.attention { border-top-color: var(--warn); }
+.verdict.held { border-top-color: var(--err); }
+.verdict.plain { border-top-color: var(--line); }
+.col:not(.review) > .verdict { position: static; margin: 0 0 12px; border-radius: var(--r-lg); }
+.verdict .headline { font-size: var(--fs-md); line-height: 1.45; color: var(--t2); }
+.verdict .headline .tally { display: block; font-weight: 600; color: var(--t); margin-bottom: 2px; }
+.verdict .headline b { font-weight: 600; color: var(--t); }
+.checkline { font-size: var(--fs-sm); color: var(--t3); margin-top: 6px; line-height: 1.5; }
+.checkline b { font-weight: 600; color: var(--t2); }
+.checkline .item { margin-top: 4px; }
+.checkline details { margin-top: 2px; }
+.checkline summary { font-size: var(--fs-sm); color: var(--t4); }
+.verdict-decision { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.decision-block > .row:first-child { margin-top: 0; }
+
+/* Three decisions of equal weight in one row. Approve is filled only when the
+   review supports it. */
+.decide { gap: 8px; }
+.decide .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.decide .actions .btn { text-align: center; padding: 8px 10px; min-height: 38px; }
+.btn { font-size: var(--fs-md); padding: 7px 14px; }
+.btn.outline { background: var(--s); border: 1px solid var(--t4); color: var(--t); }
+.btn.chosen { background: var(--brand-l); border-color: var(--brand); color: var(--t); }
+.btn.tiny { font-size: var(--fs-sm); padding: 1px 6px; }
+.decide .will, .decided-as { margin: 0; }
+.linklike { background: none; border: none; padding: 0; color: var(--brand); cursor: pointer; font: inherit; }
+.linklike:hover { text-decoration: underline; text-underline-offset: 2px; }
+.linklike:disabled { color: var(--t4); cursor: default; text-decoration: none; }
+.redo { display: none; }
+
+/* Rows: colour on the edge only where a row needs attention. */
+.gaprow { border-left-width: 1px; padding: 12px 14px 12px 12px; }
+.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.not-found { border-left-width: 4px; }
+.gaprow.tone-ok, .gaprow.covered { border-left-color: var(--line); }
+.gaprow .req .text { font-size: var(--fs-read); }
+.gaprow .src, .gaprow .chk { font-size: var(--fs-sm); }
+.gaprow .pol { font-size: var(--fs-md); }
+.gaprow .pol .cite { font-size: 12px; }
+.mark { font-size: var(--fs-sm); padding: 1px 9px; }
+.empty { color: var(--t4); padding: 18px 0; }
+.docs { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 0 4px; }
+.docs a { display: inline-flex; align-items: center; }
+
+/* Amber means "this needs your attention", and nothing else. */
+.chip { font-size: var(--fs-sm); padding: 2px 9px; }
+.chip.for_review { background: var(--brand-l); color: var(--brand); }
+.notice { font-size: var(--fs-sm); }
+.tag { font-size: 12px; font-weight: 400; padding: 1px 7px; border: 1px solid var(--line); border-radius: var(--r-xs); color: var(--t4); background: transparent; white-space: nowrap; }
+.pill { font-size: 12px; }
+
+/* The list: one line of title, one line of facts. Filters read as filters. */
+.search { font-size: var(--fs-md); padding: 7px 10px; margin: 2px 0 8px; }
+.filters { gap: 6px; margin: 0 0 10px; font-size: var(--fs-sm); }
+.filters button { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: transparent; color: var(--t3); }
+.filters button.on { background: var(--t); border-color: var(--t); color: var(--s); }
+.filters button b { color: inherit; opacity: 0.7; margin-left: 5px; font-weight: 500; }
+.filters button.on b { color: inherit; }
+.caselist li { padding: 10px 10px 10px 12px; }
+.caselist .t { font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caselist .s { font-size: var(--fs-sm); margin-top: 4px; gap: 10px; }
+.caselist .s span:first-child { flex: 1; min-width: 0; }
+.caselist .s .due .icon { display: none; }
+.invented { font-size: 12px; }
+
+/* The rest at the new scale. */
+.events { font-size: var(--fs-sm); }
+.events li { grid-template-columns: 124px 1fr; padding: 5px 0; }
+.events time { font-size: var(--fs-sm); }
+.form label { font-size: var(--fs-sm); color: var(--t2); font-weight: 500; }
+.form input, .form textarea, .form select { font-size: var(--fs-md); padding: 7px 10px; font-weight: 400; }
+.msg { font-size: var(--fs-md); }
+.msg.assistant { font-size: 15px; }
+.msg .by { font-size: 12px; }
+table.register { font-size: var(--fs-sm); }
+table.register th { font-size: var(--fs-sm); text-transform: none; letter-spacing: 0; color: var(--t2); }
+details summary { font-size: var(--fs-sm); }
+.meta { font-size: var(--fs-sm); }
+
+@media (max-width: 1100px) {
+  .columns, .columns.two { grid-template-columns: 1fr; }
+  .verdict { position: static; margin: 0 0 12px; border-radius: var(--r-lg); }
+  .col.blank { grid-column: auto; }
+}
+
+/* Dark theme, on the same token names: when the system asks for it, or when
+   the reader picks it in the top bar. The reader's pick wins either way. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171411;
+    --s: #201c17;
+    --rule: #2a251f;
+    --line: #3b352c;
+    --t: #f2ede4;
+    --t2: #dcd5c9;
+    --t3: #b9afa0;
+    --t4: #a59b8b;
+    --brand: #a794ff;
+    --brand-l: #2b2450;
+    --on-brand: #16112e;
+    --ok: #86c9a3;
+    --ok-l: #1c2d24;
+    --warn: #e3a763;
+    --warn-l: #33271a;
+    --err: #f09690;
+    --err-l: #3a201e;
+    --pin: rgba(0, 0, 0, 0.55);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171411;
+  --s: #201c17;
+  --rule: #2a251f;
+  --line: #3b352c;
+  --t: #f2ede4;
+  --t2: #dcd5c9;
+  --t3: #b9afa0;
+  --t4: #a59b8b;
+  --brand: #a794ff;
+  --brand-l: #2b2450;
+  --on-brand: #16112e;
+  --ok: #86c9a3;
+  --ok-l: #1c2d24;
+  --warn: #e3a763;
+  --warn-l: #33271a;
+  --err: #f09690;
+  --err-l: #3a201e;
+  --pin: rgba(0, 0, 0, 0.55);
+}
+
+/* The theme switch in the top bar. */
+.themeswitch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.themeswitch button { border: none; background: transparent; color: var(--t3); font-size: 12px; padding: 2px 9px; border-radius: 999px; cursor: pointer; }
+.themeswitch button.on { background: var(--t); color: var(--bg); }
+.filters button.on { color: var(--bg); }
+
+/* The filters stay on one line in the common case. */
+.filters { gap: 4px; }
+.filters button { padding: 2px 8px; }
+.filters button b { margin-left: 4px; }

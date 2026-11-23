@@ -5,7 +5,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { createDesk } = require("../server");
+const { createDesk, demoCases } = require("../server");
 
 async function main() {
   const envFile = path.join(__dirname, "..", ".env");
@@ -17,7 +17,7 @@ async function main() {
   }
   const draft = process.argv.includes("--draft");
   const desk = await createDesk(process.env);
-  const { publications } = JSON.parse(fs.readFileSync(path.join(__dirname, "publications.json"), "utf8"));
+  const publications = demoCases(desk.config);
   const existing = await desk.store.listCases();
   for (const p of publications) {
     if (existing.some((c) => c.fields.title === p.title)) {

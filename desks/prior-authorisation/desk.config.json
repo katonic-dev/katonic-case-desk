@@ -1,0 +1,338 @@
+{
+  "$comment": "What makes the generic case desk the prior authorisation desk. Start it with DESK_CONFIG=desks/prior-authorisation/desk.config.json. The health plan, its coverage policies, its members and its clinics in the demo are invented.",
+  "desk": {
+    "id": "prior-authorisation",
+    "name": "Prior authorisation desk",
+    "caseNoun": "request",
+    "caseNounPlural": "requests",
+    "draftNoun": "criteria review",
+    "deciderRole": "clinical reviewer",
+    "tagline": "Requests in, a drafted criteria review for each, a place to decide, and the register afterwards.",
+    "addLabel": "Add a request",
+    "arrivedVia": {
+      "feed": "the provider portal",
+      "officer": "the intake team"
+    }
+  },
+  "case": {
+    "heading": "THE PRIOR AUTHORISATION REQUEST",
+    "metaFields": [
+      "member_ref",
+      "provider",
+      "requested_on"
+    ],
+    "queryFields": [
+      "title",
+      "service_code",
+      "diagnosis"
+    ],
+    "detailFields": [
+      "service_code",
+      "diagnosis"
+    ],
+    "showText": "text",
+    "noTextNote": "No clinical information was supplied with this request. Say so, mark every criterion \"not documented\", and list what the provider should be asked for.",
+    "libraryHeading": "THE COVERAGE POLICIES",
+    "libraryNoun": "coverage policy library",
+    "libraryInstruction": "The desk has searched the coverage policy library \"{library}\" for you. The passages it returned are below, each with its document. Treat them as the library's search results: take the criteria from them, and cite the document and the clause number at the start of the passage. Where no passage gives criteria for the service requested, say so and write one row marked \"not documented\". Do not say that no coverage policy library is connected.",
+    "askPlaceholder": "For example: where in the request is the six weeks of physiotherapy documented?",
+    "searchPlaceholder": "Search by request, member reference or provider",
+    "demoNote": "Demo data: the health plan, its coverage policies, its members and its clinics are invented. Nothing here is clinical guidance.",
+    "listFields": [
+      "member_ref",
+      "service_code"
+    ],
+    "chipFields": [
+      "urgency"
+    ],
+    "replyHeading": "Provider's reply",
+    "replyLabel": "The provider's reply (it is added to the clinical information)",
+    "replyButton": "Add the reply and review again",
+    "replyNote": "The provider has replied. The reply is at the end of the clinical information. Check every criterion again in the light of it.",
+    "replyEvent": "added the provider's reply"
+  },
+  "demo": {
+    "file": "cases.json",
+    "key": "requests"
+  },
+  "intake": {
+    "ways": [
+      "Entered by a member of the intake team (the form at the top of the list)",
+      "Sent by the plan's provider portal or utilisation management system (POST /api/intake with X-Intake-Token)"
+    ],
+    "fields": [
+      {
+        "key": "title",
+        "label": "Request",
+        "required": true
+      },
+      {
+        "key": "member_ref",
+        "label": "Member reference",
+        "required": true
+      },
+      {
+        "key": "provider",
+        "label": "Requesting provider",
+        "required": true
+      },
+      {
+        "key": "requested_on",
+        "label": "Received on",
+        "required": true,
+        "type": "date"
+      },
+      {
+        "key": "service_code",
+        "label": "Procedure or medicine code",
+        "required": false
+      },
+      {
+        "key": "diagnosis",
+        "label": "Diagnosis given",
+        "required": false
+      },
+      {
+        "key": "urgency",
+        "label": "Urgency",
+        "required": false
+      },
+      {
+        "key": "text",
+        "label": "Clinical information supplied",
+        "required": false,
+        "type": "textarea"
+      }
+    ]
+  },
+  "draft": {
+    "instruction": "A prior authorisation request has arrived at the health plan's prior authorisation desk. Work through it in three gates, in this order, and stop at the first gate that fails.\n\nFirst, under the heading \"Summary\", summarise the request in at most six lines: what is requested, the member reference, who asked, the diagnosis given, the urgency, and which coverage policy applies.\n\nGATE 1. Under the heading \"Completeness check\", write a Markdown table with exactly these three columns, one row per item, in this order:\n| Item | Status | What was found |\n- Member reference: present.\n- Requesting provider: named, with their practice.\n- Diagnosis: a diagnosis is given.\n- Procedure or medicine code: at least one code is given.\n- Clinical information present: a clinical narrative is supplied, not only codes or one sentence.\n- Clinical information of substance: it has patient-specific history, symptoms, examination findings or test results, and is not boilerplate or copied template text.\n- Urgency: stated.\n- More than one code: \"complete\" when there is one code; \"incomplete\" when there are several, listing them so the reviewer can check they may be requested together.\n- Type of service: can be classed as a procedure, medicine, imaging, device, therapy or facility stay.\nStatus is exactly one of: complete, incomplete, missing. \"missing\" means absent; \"incomplete\" means present but not enough. Do not judge clinical merit here.\nThese items hold the request up: Member reference; Requesting provider; Diagnosis; Procedure or medicine code; Clinical information present; Clinical information of substance. If any of them is not \"complete\", the gate fails.\n\nGATE 2. Find the coverage policy for the service requested, and check that the diagnosis given is one the policy covers. If no policy covers the service, or the diagnosis is outside the policy, the gate fails.\n\nGATE 3. Under the heading \"Draft criteria review. For review by a clinical reviewer. Not issued.\", check the request against the coverage policy as a Markdown table with exactly these seven columns, one row per criterion in the policy:\n| # | Criterion | Policy source | Evidence in the request | Where | Mark | Reviewer should check |\n- Criterion: the criterion in the policy's own words.\n- Policy source: the policy document and clause.\n- Evidence in the request: what the clinical information supplied says on it, quoted or closely paraphrased. If it says nothing, write \"Nothing supplied\".\n- Where: where in the request the evidence is (the note, the date, the result).\n- Mark: exactly one of: met, partly met, not met, not documented.\n- Reviewer should check: what a clinical reviewer should verify.\nUse \"not documented\" when the request is silent, and \"not met\" only when the request shows the opposite of what the criterion asks. A shortfall the provider could cure is not \"not met\". Where a criterion falls short only because a record, a date or a count is incomplete (for example five weeks recorded where six are required), mark it \"partly met\" and propose asking the provider for exactly what is missing. Keep \"not met\" and referral to the medical director for a request that shows the criterion cannot be met, such as a diagnosis the policy does not cover or a finding that rules the criterion out.\n\nIf gate 1 or gate 2 failed, do not write the criteria table. Write one sentence under that heading saying which gate stopped the review and why.\n\nLast, write one line that starts \"Proposed next step:\" and is exactly one of: \"approve, every criterion is met\"; \"ask the provider for more information\" followed by the numbered list of what to ask for; or \"refer to the medical director\" followed by the gate or the criterion that is not met. Never propose a denial: only a medical director can decide against a request. Write nothing after that line.",
+    "sections": [
+      "Summary",
+      "Completeness check"
+    ],
+    "marks": {
+      "met": "Met",
+      "partly met": "Partly met",
+      "not met": "Not met",
+      "not documented": "Not documented"
+    },
+    "markTones": {
+      "met": "ok",
+      "partly met": "warn",
+      "not met": "err",
+      "not documented": "none"
+    },
+    "proposalPrefix": "Proposed next step:",
+    "passMark": "met",
+    "checklist": {
+      "heading": "Completeness check",
+      "items": [
+        "Member reference",
+        "Requesting provider",
+        "Diagnosis",
+        "Procedure or medicine code",
+        "Clinical information present",
+        "Clinical information of substance",
+        "Urgency",
+        "More than one code",
+        "Type of service"
+      ],
+      "blocking": [
+        "Member reference",
+        "Requesting provider",
+        "Diagnosis",
+        "Procedure or medicine code",
+        "Clinical information present",
+        "Clinical information of substance"
+      ]
+    },
+    "reviewHeading": "Draft criteria review"
+  },
+  "decisions": [
+    {
+      "id": "approve",
+      "label": "Approve the request",
+      "outcome": "issued",
+      "needsNote": false,
+      "hint": "Approves the request and records version {version}{edited} of the review in your name."
+    },
+    {
+      "id": "request_info",
+      "label": "Ask the provider for more information",
+      "outcome": "info_requested",
+      "needsNote": true,
+      "noteLabel": "What the provider should send",
+      "noteHint": "This text goes into the letter to the provider, one item to a line. The request waits here until the reply is added."
+    },
+    {
+      "id": "refer",
+      "label": "Refer to the medical director",
+      "outcome": "referred",
+      "needsNote": true,
+      "noteLabel": "Which criterion is not met, and why"
+    },
+    {
+      "id": "send_back",
+      "label": "Ask the agent to redo the review",
+      "outcome": "sent_back",
+      "needsNote": true,
+      "noteLabel": "What the agent got wrong or missed (it sees this note)"
+    }
+  ],
+  "statuses": {
+    "new": "New",
+    "drafting": "Drafting",
+    "for_review": "For review",
+    "sent_back": "Being redone",
+    "issued": "Approved",
+    "info_requested": "Waiting for the provider",
+    "referred": "With the medical director",
+    "removed": "Removed"
+  },
+  "closedStatuses": [
+    "issued",
+    "referred",
+    "removed"
+  ],
+  "register": {
+    "heading": "Every decision and every removal, in the order it was taken. The desk has no deny decision: a request that does not meet the criteria goes to the medical director.",
+    "columns": [
+      "case_id",
+      "title",
+      "member_ref",
+      "provider",
+      "requested_on",
+      "service_code",
+      "urgency",
+      "arrived_via",
+      "requested_by",
+      "draft_versions",
+      "decision",
+      "decided_by",
+      "identity_source",
+      "decided_at",
+      "note",
+      "letter_number",
+      "library",
+      "agent_id",
+      "run_ids",
+      "tool_calls",
+      "platform_warning",
+      "agent_session_id"
+    ],
+    "screenColumns": [
+      "title",
+      "member_ref",
+      "service_code",
+      "requested_on",
+      "decision",
+      "decided_by",
+      "decided_at",
+      "note",
+      "letter_number",
+      "draft_versions"
+    ],
+    "labels": {
+      "title": "Request",
+      "member_ref": "Member",
+      "service_code": "Code",
+      "requested_on": "Received",
+      "decision": "Decision",
+      "decided_by": "Decided by",
+      "decided_at": "Decided at",
+      "note": "Note",
+      "draft_versions": "Review versions",
+      "letter_number": "Letter"
+    },
+    "recordRemovals": true
+  },
+  "rules": {
+    "fourEyes": true,
+    "fourEyesText": "The person who entered a request cannot decide it. Any other clinical reviewer can. You can still ask the agent to redo the review.",
+    "reasonToApproveUnmet": true,
+    "reasonToApproveUnmetText": "Approving while a criterion is not marked met needs a reason",
+    "reasonToApproveUnmetLabel": "Why you are approving although a criterion is not marked met",
+    "redraftOnSendBack": true,
+    "fourEyesAllowsRedo": true
+  },
+  "due": {
+    "field": "requested_on",
+    "urgencyField": "urgency",
+    "standardDays": 14,
+    "expeditedDays": 3,
+    "$comment": "The invented plan's turnaround. Set these to the plan's own."
+  },
+  "waitingStatuses": [
+    "info_requested"
+  ],
+  "next": {
+    "issued": "The request is approved. Nothing further happens on this desk.",
+    "info_requested": "When the provider replies, add the reply here. The agent checks every criterion again and the request comes back for review.",
+    "referred": "The medical director decides. This desk records nothing further on the request."
+  },
+  "letters": {
+    "issued": {
+      "title": "Prior authorisation: approved",
+      "linkLabel": "Approval letter",
+      "prefix": "PA",
+      "days": 90,
+      "toField": "provider",
+      "opening": "The prior authorisation request below has been approved.",
+      "fields": [
+        "member_ref",
+        "title",
+        "service_code",
+        "diagnosis"
+      ],
+      "list": "met",
+      "listHeading": "Coverage criteria met",
+      "dateLine": "Authorisation period: {date} to {until}.",
+      "body": [
+        "This authorisation covers the service described above when it is provided within the authorisation period.",
+        "It does not guarantee payment. Payment depends on the member's eligibility on the day of service.",
+        "If you have questions, contact the utilisation management team and quote {number}."
+      ],
+      "signature": "Utilisation Management, Harbourline Health Plan (an invented plan, for demonstration)"
+    },
+    "info_requested": {
+      "title": "Prior authorisation: more information needed",
+      "linkLabel": "Letter asking for information",
+      "prefix": "PI",
+      "days": 30,
+      "toField": "provider",
+      "opening": "We cannot complete the review of the request below until we have more information. This is not a decision on the request.",
+      "fields": [
+        "member_ref",
+        "title",
+        "service_code",
+        "diagnosis"
+      ],
+      "list": "note",
+      "listHeading": "What we need",
+      "dateLine": "Please send it by {until}.",
+      "body": [
+        "If we have not received it by then, the request will be reviewed on the information we hold.",
+        "Send it through the provider portal and quote {number}."
+      ],
+      "signature": "Utilisation Management, Harbourline Health Plan (an invented plan, for demonstration)"
+    }
+  },
+  "audit": {
+    "outcomes": [
+      "issued",
+      "referred"
+    ],
+    "linkLabel": "Download the audit record"
+  },
+  "decisionLabels": {
+    "issued": "Approved",
+    "info_requested": "Asked the provider for information",
+    "referred": "Referred to the medical director",
+    "sent_back": "Asked the agent to redo the review",
+    "removed": "Removed from the desk"
+  },
+  "filterLabels": {
+    "info_requested": "Waiting"
+  }
+}
