@@ -149,7 +149,7 @@ function GapRows({ config, rows }) {
   const rl = config.draft.rowLabels || {};
   // A desk that labels the citation ("Evidence") gets its lines in two aligned columns.
   if (rl.citation) {
-    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: "v" }, value));
+    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, value));
     return h(
       "div",
       { className: "gap" },
@@ -212,7 +212,10 @@ function Fields({ config, form, setForm, prefix = "f" }) {
       { key: f.key, htmlFor: id },
       f.label + (f.required ? "" : " (optional)"),
       f.hint ? h("span", { className: "hint" }, f.hint) : null,
-      f.type === "textarea"
+      // A field with options is a list to choose from (intake.fields[].options).
+      Array.isArray(f.options) && f.options.length
+        ? h("select", { id, name: f.key, value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) }, h("option", { key: "", value: "" }, "Choose one"), f.options.map((o) => h("option", { key: o, value: o }, o)))
+        : f.type === "textarea"
         ? h("textarea", { id, name: f.key, value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) })
         : h("input", { id, name: f.key, type: f.type === "date" ? "date" : "text", value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) }),
     );
@@ -245,7 +248,7 @@ function IntakeForm({ config, onCreated }) {
     }
   }
   const label = config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`;
-  const opener = h("button", { className: "btn", onClick: () => setOpen(true) }, label);
+  const opener = h("button", { className: "btn", onClick: () => { setErr(""); setOpen(true); } }, label);
   if (!open) return opener;
   return h(React.Fragment, null, opener, h("div", { className: "overlay", onMouseDown: (e) => { if (e.target === e.currentTarget) setOpen(false); } }, h(
     "form",
@@ -399,10 +402,19 @@ function proposedDecision(config, text) {
   const t = String(text || "").trim().toLowerCase();
   let best = null;
   for (const d of config.decisions) {
-    const p = String(d.proposalPrefix || "").toLowerCase();
-    if (t && p && t.startsWith(p) && (!best || p.length > best.p.length)) best = { id: d.id, p };
+    // A decision may name one prefix or a list of them.
+    for (const raw of [].concat(d.proposalPrefix || [])) {
+      const p = String(raw || "").toLowerCase();
+      if (t && p && t.startsWith(p) && (!best || p.length > best.p.length)) best = { id: d.id, p };
+    }
   }
   return best ? best.id : "";
+}
+
+// The two labels of the phone jump bar: the case (case.jumpLabel, else "Questionnaire") and the draft noun.
+function jumpLabels(config) {
+  const noun = String((config.desk && config.desk.draftNoun) || "assessment");
+  return [(config.case && config.case.jumpLabel) || "Questionnaire", noun.charAt(0).toUpperCase() + noun.slice(1)];
 }
 
 function CaseView({ config, me, c, refresh }) {
@@ -802,7 +814,7 @@ function CaseView({ config, me, c, refresh }) {
   if (twoPane) {
     const jump = (id) => () => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
     return [
-      h("div", { key: "jump", className: "jump", role: "group", "aria-label": "Jump to" }, h("button", { className: "btn quiet", onClick: jump("pane-questionnaire") }, "Questionnaire"), h("button", { className: "btn quiet", onClick: jump("pane-assessment") }, "Assessment")),
+      h("div", { key: "jump", className: "jump", role: "group", "aria-label": "Jump to" }, h("button", { className: "btn quiet", onClick: jump("pane-questionnaire") }, jumpLabels(config)[0]), h("button", { className: "btn quiet", onClick: jump("pane-assessment") }, jumpLabels(config)[1])),
       h("div", { key: "source", id: "pane-questionnaire", className: "col source" }, header, supplied, chat),
       h("div", { key: "review", id: "pane-assessment", className: "col review" }, notices, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
     ];

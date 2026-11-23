@@ -163,6 +163,13 @@ agent that drafted it. The page shows the kind with the case's other details.
 With no `routing` key nothing changes. The stand-in does not know about agents:
 its replies come from `demo-replies.json`.
 
+**Small page settings.** All optional; with none of them nothing changes.
+
+- `case.jumpLabel`: the first button of the jump bar on a phone. Default "Questionnaire". The second button is the draft noun, `desk.draftNoun`, with a capital.
+- `decisions[].proposalPrefix`: one prefix, or a list of them, with which the agent's proposal line starts when it means this decision. The button is marked "Agent's proposal".
+- `draft.plainSource`: set `true` when the first column of a row ("Required by") holds a sentence and not a clause number, so it is not set in monospace.
+- `intake.fields[].options`: a list of values. The form shows a list to choose from instead of a text box.
+
 ## What is real and what is a stand-in
 
 | Piece | State |
