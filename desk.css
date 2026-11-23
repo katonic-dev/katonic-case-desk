@@ -160,6 +160,7 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .events li { padding: 4px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 108px 1fr; gap: 8px; }
 .events time { font-size: var(--fs-sm); color: var(--t4); padding-top: 1px; }
 .events .who { font-weight: 500; color: var(--t2); }
+.events li > span { white-space: pre-line; }
 
 /* The decision and the conversation. */
 .decide { display: flex; flex-direction: column; gap: 8px; }
