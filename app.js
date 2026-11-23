@@ -301,7 +301,7 @@ function Sweeps({ config, onOpened }) {
       h(
         "details",
         { key: s.id },
-        h("summary", null, `${s.regulator}, ${fmt(s.ran_at)}: ${s.error ? "failed" : `${s.found.length} line${s.found.length === 1 ? "" : "s"} that look like a publication`}`),
+        h("summary", null, `${s.regulator}, ${fmt(s.ran_at)}: ${s.error ? "failed" : `${s.found.length} line${s.found.length === 1 ? " that looks" : "s that look"} like a publication`}`),
         s.error ? h("div", { className: "notice bad" }, s.error) : null,
         s.found.map((f, i) =>
           h(
@@ -679,7 +679,8 @@ function CaseView({ config, me, c, refresh }) {
     h("ul", { key: "hl", className: "events" }, c.events.map((e, i) => {
       const arrived = /^arrived via (\w+)$/.exec(e.what);
       const from = arrived && viaLabel(config, arrived[1]);
-      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : h("span", null, h("span", { className: "who" }, e.who), " ", e.what));
+      const plainVia = arrived && e.who === arrived[1] ? { feed: "Arrived from the feed", sweep: "Found by a sweep" }[arrived[1]] : "";
+      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : plainVia ? h("span", null, plainVia) : h("span", null, h("span", { className: "who" }, e.who), " ", e.what));
     })),
   ];
 
@@ -719,7 +720,10 @@ function Register({ config, onOpen }) {
     api("/api/register").then(setRows).catch(() => {});
   }, []);
   const cols = config.register.screenColumns || config.register.columns.filter((c) => !["agent_session_id", "run_ids", "agent_id", "tool_calls", "platform_warning"].includes(c));
-  const heading = (c) => (config.register.labels || {})[c] || labelOf(config, c).replace(/_/g, " ");
+  const heading = (c) => {
+    const t = (config.register.labels || {})[c] || labelOf(config, c).replace(/_/g, " ");
+    return t ? t[0].toUpperCase() + t.slice(1) : t;
+  };
   const cell = (r, c) => {
     if (c === "decided_at") return fmt(r[c]);
     if (c === "title" && onOpen) return h("a", { href: "#", onClick: (e) => { e.preventDefault(); onOpen(r.case_id); } }, r[c]);
@@ -828,7 +832,8 @@ function App() {
     const db = dueOf(config, b);
     return da && db ? da.date - db.date : 0;
   };
-  const shown = list.filter(active.test).filter((c) => !q || Object.values(c.fields).join(" ").slice(0, 2000).toLowerCase().includes(q)).sort(byDue);
+  const pool = q ? list : list.filter(active.test);
+  const shown = pool.filter((c) => !q || Object.values(c.fields).join(" ").slice(0, 2000).toLowerCase().includes(q)).sort(byDue);
   const listFields = (config.case && config.case.listFields) || metaFields(config);
   const counts = Object.fromEntries(filters.map((f) => [f.id, list.filter(f.test).length]));
 
@@ -858,7 +863,7 @@ function App() {
             h("input", { className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
             h("div", { className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
             h("ul", { className: "caselist" }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => setSelected(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
-            shown.length ? h("p", { className: "small" }, `${shown.length} of ${list.length}`) : h("p", { className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
+            shown.length ? h("p", { className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
             config.sweeps ? h(Sweeps, { config, onOpened: async (c) => { await refresh(); setSelected(c.id); } }) : null,
             h("p", { className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
           ),

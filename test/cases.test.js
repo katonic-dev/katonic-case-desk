@@ -203,3 +203,15 @@ test("the records go to DATA_DIR, else the attached dataset, else a local folder
   assert.equal(onDataset.kept, true);
   assert.equal(dataDir({}).kept, false);
 });
+
+test("the issued document says who wrote each version: a redo is the agent's, an edit is the officer's", () => {
+  const c = dropped();
+  cases.recordDraft(c, "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: covered.", "agent", "s");
+  cases.applyDecision(CONFIG, c, "send_back", second, "Look again at requirement 1.");
+  cases.recordDraft(c, "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: partly covered.", "agent", "s");
+  cases.applyDecision(CONFIG, c, "approve", second, "", "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: partly covered, clause 4.");
+  const doc = cases.issuedDocument(CONFIG, c);
+  assert.ok(doc.includes("Draft version 3 of 3. The agent wrote versions 1 and 2."), doc.split("\n")[3]);
+  assert.ok(doc.includes(`${second.email} edited version 3.`));
+  assert.ok(!doc.includes("later versions by the officer"));
+});
