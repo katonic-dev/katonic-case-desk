@@ -411,6 +411,11 @@ function proposedDecision(config, text) {
   return best ? best.id : "";
 }
 
+// Approve is the filled button when every row passes, unless the agent proposes another decision.
+function leansApprove(allPass, proposedId, approve) {
+  return (allPass == null ? true : allPass) && (!proposedId || !approve || proposedId === approve.id);
+}
+
 // The two labels of the phone jump bar: the case (case.jumpLabel, else "Questionnaire") and the draft noun.
 function jumpLabels(config) {
   const noun = String((config.desk && config.desk.draftNoun) || "assessment");
@@ -633,9 +638,10 @@ function CaseView({ config, me, c, refresh }) {
     const others = config.decisions.filter((d) => d !== approve && d.outcome !== "sent_back");
     // Where the desk has a pass mark, Approve is the filled button only when
     // every row carries it; otherwise approving takes a reason.
-    const leanApprove = c.all_pass == null ? true : c.all_pass;
-    const approveNeedsReason = Boolean(config.rules.reasonToApproveUnmet && c.all_pass === false);
+    // When the agent proposes another decision, Approve is not the filled one.
     const proposedId = proposedDecision(config, c.proposal);
+    const leanApprove = leansApprove(c.all_pass, proposedId, approve);
+    const approveNeedsReason = Boolean(config.rules.reasonToApproveUnmet && c.all_pass === false);
     const tag = (d) => (proposedId === d.id ? h("span", { className: "proposed" }, "Agent's proposal") : null);
     const noteLabel = (d) => d.noteLabel || (d.outcome === "sent_back" ? "What the agent should change (it sees this note)" : "Note (kept in the register)");
     decisionPanel = h(

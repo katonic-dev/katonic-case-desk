@@ -17,7 +17,8 @@ function lift(name) {
 }
 const ctx = {};
 vm.createContext(ctx);
-vm.runInContext(`${lift("jumpLabels")}\n${lift("proposedDecision")}`, ctx);
+vm.runInContext(`${lift("jumpLabels")}
+${lift("leansApprove")}\n${lift("proposedDecision")}`, ctx);
 
 test("jump bar: the first label defaults to Questionnaire, the second is the draft noun", () => {
   assert.deepEqual(Array.from(ctx.jumpLabels({ desk: { draftNoun: "assessment" }, case: {} })), ["Questionnaire", "Assessment"]);
@@ -54,4 +55,13 @@ test("an intake field with options is drawn as a list; one without is a text box
   assert.equal(kind.tag, "select");
   assert.deepEqual(kind.kids.map((o) => o.props.value), ["", "A", "B"]);
   assert.equal(control(out[1]).tag, "input");
+});
+
+test("Approve is the filled button only when every row passes and the agent does not propose another decision", () => {
+  const approve = { id: "approve" };
+  assert.equal(ctx.leansApprove(true, "", approve), true);
+  assert.equal(ctx.leansApprove(null, "", approve), true);
+  assert.equal(ctx.leansApprove(true, "approve", approve), true);
+  assert.equal(ctx.leansApprove(true, "refer", approve), false);
+  assert.equal(ctx.leansApprove(false, "approve", approve), false);
 });
