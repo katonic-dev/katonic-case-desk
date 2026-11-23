@@ -471,3 +471,11 @@ table.register td:nth-child(2), table.register td:nth-child(3), table.register t
 @media (max-width: 1100px) {
   .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 600px) {
+  .tabs button, .filters button, .themeswitch button { min-height: 36px; }
+  .tabs button { padding: 0 6px; }
+  .themeswitch button { padding: 2px 12px; }
+}
+/* A long status ("Waiting for the supplier") goes to its own line instead of cutting the date. */
+.caselist .s { flex-wrap: wrap; }
+.caselist .s span:first-child { flex: none; overflow: visible; }
