@@ -3,9 +3,15 @@
 // stream) with canned text that says it is canned. Nothing it writes is a
 // real gap analysis. Point the desk at it with
 //   KATONIC_BASE_URL=http://localhost:8390 KATONIC_API_KEY=kapi_fake KATONIC_AGENT_ID=fake
+// A desk whose settings folder is outside this repository can carry its own
+// replies: a file demo-replies.json beside desk.config.json (see README.md).
+// The stand-in finds the folder through DESK_CONFIG, the variable the desk
+// itself uses, so start both with the same value.
 // Never use it on the platform.
 
+const fs = require("fs");
 const http = require("http");
+const path = require("path");
 
 const PORT = Number(process.env.PORT || 8390);
 
@@ -111,7 +117,46 @@ function cannedPriorAuth(text) {
   ].join("\n");
 }
 
-function canned(text, sessionId) {
+// The settings folder's own replies, when DESK_CONFIG names one that has a
+// demo-replies.json. Returns null when there is no such file, so a desk
+// without one is answered as before. The path is read as the desk reads it:
+// absolute, or from the folder above this one.
+function loadDesk(env) {
+  if (!env.DESK_CONFIG) return null;
+  try {
+    const file = path.resolve(__dirname, "..", env.DESK_CONFIG);
+    const dir = path.dirname(file);
+    const replies = JSON.parse(fs.readFileSync(path.join(dir, "demo-replies.json"), "utf8"));
+    return { config: JSON.parse(fs.readFileSync(file, "utf8")), replies };
+  } catch (err) {
+    return null;
+  }
+}
+
+// The reply a desk's own file gives for a draft request: the one whose key is
+// found, without regard to case, in the case's title line; else the file's
+// default; else null. The first line says that this is a stand-in.
+function cannedFromFile(desk, text) {
+  const { config, replies } = desk;
+  const heading = (config.case && config.case.heading) || "THE PUBLICATION";
+  if (!text.includes(heading) || text.includes("THE QUESTION")) return null;
+  const titleField = config.intake.fields.find((f) => f.key === "title");
+  const label = (titleField ? titleField.label : "Title") + ": ";
+  const line = (text.split(/\r?\n/).find((l) => l.startsWith(label)) || text).toLowerCase();
+  const map = replies.replies || {};
+  const key = Object.keys(map).find((k) => line.includes(k.toLowerCase()));
+  const body = key ? map[key] : replies.default;
+  if (!body) return null;
+  const redo = text.includes("THE PREVIOUS DRAFT") || /sent back with this note/.test(text);
+  const note = (text.match(/sent back with this note: (.*)$/m) || [, ""])[1];
+  const noun = (config.desk && config.desk.draftNoun) || "draft";
+  return [`[Stand-in agent: canned text so the screen can be seen without a platform. Not a real ${noun}.${redo ? ` This is the redo; the note was: "${note}".` : ""}]`, "", body].join("\n");
+}
+
+function canned(text, sessionId, env = process.env) {
+  const desk = loadDesk(env);
+  const own = desk ? cannedFromFile(desk, text) : null;
+  if (own) return own;
   if (text.includes("THE PRIOR AUTHORISATION REQUEST") && !text.includes("THE QUESTION")) return cannedPriorAuth(text);
   if (text.includes("What has")) {
     return "[Stand-in agent: canned reply, not a search.]\n- Example publication A - 2026-11-03 - example of a line the desk can open as a case - https://example.invalid/a\nNothing else for the period.";
@@ -139,36 +184,43 @@ function canned(text, sessionId) {
   ].join("\n");
 }
 
-const server = http.createServer((req, res) => {
-  let raw = "";
-  req.on("data", (c) => (raw += c));
-  req.on("end", () => {
-    const body = raw ? JSON.parse(raw) : {};
-    if (req.url === "/public/v1/chat" && req.method === "POST") {
-      const text = body.messages && body.messages[0] ? body.messages[0].content : "";
-      const sid = body.session_id || `fake-session-${Date.now()}`;
-      const reply = canned(text, body.session_id);
-      res.writeHead(200, { "Content-Type": "text/event-stream" });
-      res.write(`data: ${JSON.stringify({ type: "RUN_STARTED", thread_id: sid, run_id: `fake-run-${Date.now()}` })}\n\n`);
-      const pieces = reply.match(/.{1,40}/gs) || [];
-      let i = 0;
-      const tick = setInterval(() => {
-        if (i >= pieces.length) {
-          clearInterval(tick);
-          res.write("data: [DONE]\n\n");
-          return res.end();
-        }
-        res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", delta: pieces[i++] })}\n\n`);
-      }, 15);
-      return;
-    }
-    if (req.url === "/public/v1/sessions" && req.method === "POST") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ id: `fake-session-${Date.now()}` }));
-    }
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "the stand-in platform knows only /public/v1/chat and /public/v1/sessions" }));
+function createServer(env = process.env) {
+  return http.createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      const body = raw ? JSON.parse(raw) : {};
+      if (req.url === "/public/v1/chat" && req.method === "POST") {
+        const text = body.messages && body.messages[0] ? body.messages[0].content : "";
+        const sid = body.session_id || `fake-session-${Date.now()}`;
+        const reply = canned(text, body.session_id, env);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`data: ${JSON.stringify({ type: "RUN_STARTED", thread_id: sid, run_id: `fake-run-${Date.now()}` })}\n\n`);
+        const pieces = reply.match(/.{1,40}/gs) || [];
+        let i = 0;
+        const tick = setInterval(() => {
+          if (i >= pieces.length) {
+            clearInterval(tick);
+            res.write("data: [DONE]\n\n");
+            return res.end();
+          }
+          res.write(`data: ${JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", delta: pieces[i++] })}\n\n`);
+        }, 15);
+        return;
+      }
+      if (req.url === "/public/v1/sessions" && req.method === "POST") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ id: `fake-session-${Date.now()}` }));
+      }
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "the stand-in platform knows only /public/v1/chat and /public/v1/sessions" }));
+    });
   });
-});
+}
 
-server.listen(PORT, "127.0.0.1", () => console.log(`stand-in platform on ${PORT}: canned replies, not a real agent`));
+module.exports = { canned, createServer };
+
+if (require.main === module) {
+  const own = loadDesk(process.env);
+  createServer(process.env).listen(PORT, "127.0.0.1", () => console.log(`stand-in platform on ${PORT}: canned replies, not a real agent${own ? ` (replies from the settings folder of ${own.config.desk.id})` : ""}`));
+}
