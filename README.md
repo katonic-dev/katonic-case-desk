@@ -229,6 +229,50 @@ When the agent's reply has a line that is exactly `heading`, after the table, th
 
 Dates written like 21 Jul 1990 are kept whole across line ends, as ids and 2026-11-19 are. In a decided case the history reads with the desk's own past-tense label (`decisionLabels`) where it has one, for example "escalated: ...". A note follows a colon, or is a second sentence ("... . Note: ...") when the label already holds a colon.
 
+**A decision the agent carries out.** On most desks a decision only records what a person chose. A decision may also carry `act`, and then the agent does the work the person confirmed, through its own tools, and reports what the systems returned:
+
+```json
+{
+  "id": "carry_out",
+  "label": "Confirm and carry out",
+  "outcome": "issued",
+  "needsNote": false,
+  "hint": "Confirms version {version}{edited} and sends it to the agent to carry out.",
+  "act": {
+    "instruction": "The staff member has confirmed the proposal below. Carry out exactly what it says...",
+    "title": "What the bank's systems returned",
+    "waitingWords": ["waiting for approval"],
+    "followUp": "Read the state of each request in the earlier outcome and report what it now shows. Change nothing.",
+    "doneStatus": "carried_out",
+    "waitingStatus": "waiting_approval",
+    "failedStatus": "not_carried_out"
+  }
+}
+```
+
+What happens when a person takes that decision:
+
+1. The decision is recorded as any decision is: who, when, the note, the version approved (an edit is a new version), the four-eyes rule, and the kind's allowed decisions. A decision the kind does not allow is refused with 409 and nothing is sent.
+2. The case takes the status `acting` ("Carrying out") and the desk sends the agent **one** message: `act.instruction`, a line that tells it to read the current state first and do nothing that is already done, the case as the desk holds it, the draft as approved (the rows and the proposal, with the person's edits) and the person's note. The page shows the agent at work and refreshes on its own.
+3. The agent's reply is kept as the **outcome** of the case (the text, the time, and who made the desk ask). It is shown on the case in a card of its own under `act.title`, set for reading, never read as HTML. It is part of the issued document. The register gets a row for each answer, with the first line of the answer in a column `outcome` (name the column in `register.columns` to see it), and "What happened" gets a line for each step.
+4. If the reply holds one of `act.waitingWords` (without regard to case), the case takes `act.waitingStatus` and stays open. The card offers one button, "Ask for the outcome again", which sends `act.followUp` with the case, the proposal's own line and the earlier outcome. Each answer is added to the card, newest first. When an answer no longer holds a waiting word the case takes `act.doneStatus`, which counts as closed. Without `waitingWords` the first answer closes the case.
+5. If the agent cannot be reached, or answers with an error, nothing is lost. The decision stands. The case takes `act.failedStatus`, the card says what the agent said and offers "Try again", which sends the **same message** again. The desk never tries a second time on its own. A failed ask for the outcome leaves the case waiting: what was asked for earlier is not undone. If the desk itself stops while the agent is working, the case comes back as not carried out, and a retry is safe because the agent reads the state first.
+
+One click sends one message. A second click, two clicks at once and a reload find a case that is already being carried out and send nothing. A case that has been sent to the agent cannot be drafted again, removed or have its details changed.
+
+Every `act` key is optional except that a desk will want `instruction`: `title` (default "What the agent returned"), `waitingWords`, `followUp`, `doneStatus` (`carried_out`), `waitingStatus` (`waiting_for_outcome`), `failedStatus` (`not_carried_out`), `askAgainLabel`, `retryLabel`, and the short lines `workingNote`, `waitingNote`, `doneNote`, `failedNote` that sit above the answer in each state. Give the three statuses a label in `statuses`; the desk supplies "Carrying out", "Carried out", "Waiting for the outcome" and "Not carried out" where you give none. A decision with an act opens a form with an optional note before it is sent (a note is required only if `needsNote` is not `false`). The desk reads only the waiting words: an answer that says the system refused still closes the case, and the person reads the card. A desk with no `act` looks and behaves as before.
+
+The stand-in platform plays an act from `demo-replies.json` with three optional keys beside `replies`: `actions` (the reply to the act message, keyed like `replies` by a part of the case title), `followUps` (the reply to the question about the outcome; a list gives one answer for each time it is asked, the last repeating), and `failActionOnce` (a list of keys whose first act message is answered with an error, so the failure path can be tried). `actionDefault` and `followUpDefault` answer any other case.
+
+```json
+{
+  "replies": { "Quillfeather": "Summary\n..." },
+  "actions": { "Quillfeather": "Waiting for approval. Three requests were made." },
+  "followUps": { "Quillfeather": ["Still waiting for approval.", "All approved. DSP-6002 is open."] },
+  "failActionOnce": ["Tarrowgate"]
+}
+```
+
 ## What is real and what is a stand-in
 
 | Piece | State |
@@ -298,6 +342,7 @@ test/                node:test, including the desk end to end against a fake pla
 | `PATCH /api/cases/:id`, `POST /api/cases/:id/remove` | Correct the details, or remove a wrong entry with a note |
 | `POST /api/cases/:id/draft` | Ask the agent to draft (again) |
 | `POST /api/cases/:id/decision` | `{decision, note, draft}`: approve, send_back, no_action |
+| `POST /api/cases/:id/outcome/again`, `POST /api/cases/:id/outcome/retry` | Ask the agent for the outcome again (a case that waits), or send the same request again (a case that was not carried out). Only for a decision with an `act` |
 | `POST /api/cases/:id/chat` | Ask the agent about this case |
 | `GET /api/cases/:id/issued.md` | The issued document |
 | `GET /api/sweeps`, `POST /api/sweeps`, `POST /api/sweeps/:id/open` | Sweeps |
