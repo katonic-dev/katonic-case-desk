@@ -202,6 +202,8 @@ When the agent's reply has a line that is exactly `heading`, after the table, th
 
 **Small page settings** (all optional):
 
+- `draft.markTones`: a tone for each mark: `ok`, `warn`, `err`, `none` or `person`. `person` is for a mark that is not a pass or a fail but needs a person to decide it: it is shown in the brand colour with a diamond, not in red.
+- `letters.<outcome>.dateStyle`: `"long"` writes the dates of a letter as 8 Dec 2026. Without it they are written as 2026-12-08.
 - `draft.rowLabels.check`: the label of the last line of a row. Default "Check".
 - `due.workingDays`: `true` counts `standardDays` and `expeditedDays` as working days, Monday to Friday, with no holidays. Without it they are calendar days.
 - Names: in "What happened", the waiting notice and the other notices, a person is shown by name where the desk can derive it (the signed-in person, the person who entered the case, or `first.last@...` read as "First Last"). The address stays as the element's title. The register and the export keep the address.

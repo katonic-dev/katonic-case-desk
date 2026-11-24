@@ -136,6 +136,7 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .gaprow.tone-warn { border-left-color: var(--warn); }
 .gaprow.tone-err { border-left-color: var(--err); }
 .gaprow.tone-none { border-left-color: var(--t4); }
+.gaprow.tone-person { border-left-color: var(--brand); }
 .gaprow .n { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t4); padding-top: 3px; }
 .gaprow .req { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .gaprow > div { min-width: 0; }
@@ -154,6 +155,7 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .mark.tone-warn { background: var(--warn-l); color: var(--warn); }
 .mark.tone-err { background: var(--err-l); color: var(--err); }
 .mark.tone-none { background: var(--rule); color: var(--t4); }
+.mark.tone-person { background: var(--brand-l); color: var(--brand); font-weight: 600; }
 
 /* The timeline. */
 .events { font-size: var(--fs-base); color: var(--t2); list-style: none; padding: 0; margin: 0; }
@@ -326,7 +328,7 @@ h3 .version { font-weight: 400; color: var(--t4); }
 
 /* Rows: colour on the edge only where a row needs attention. */
 .gaprow { border-left-width: 1px; padding: 12px 14px 12px 15px; }
-.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.not-found { border-left-width: 4px; padding-left: 12px; }
+.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.tone-person, .gaprow.not-found { border-left-width: 4px; padding-left: 12px; }
 .gaprow.tone-ok, .gaprow.covered { border-left-color: var(--line); }
 .gaprow .req .text { font-size: var(--fs-read); }
 .gaprow .src, .gaprow .chk { font-size: var(--fs-sm); }
@@ -475,7 +477,8 @@ table.register td.c-note { white-space: pre-line; }
   .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
-  .tabs button, .filters button, .themeswitch button { min-height: 36px; }
+  .tabs button, .filters button, .themeswitch button { min-height: 40px; }
+  .btn, .decide .actions .btn, .btn.tiny { min-height: 40px; }
   .tabs button { padding: 0 6px; }
   .themeswitch button { padding: 2px 12px; }
 }
@@ -502,7 +505,7 @@ table.register td.c-note { white-space: pre-line; }
 .jump { display: none; }
 @media (max-width: 1100px) {
   .jump { display: flex; gap: 8px; position: sticky; top: 0; z-index: 6; background: var(--s); border-bottom: 1px solid var(--line); padding: 6px 16px; }
-  .jump .btn { border-color: var(--line); color: var(--t); min-height: 36px; }
+  .jump .btn { border-color: var(--line); color: var(--t); min-height: 40px; }
   #pane-questionnaire, #pane-assessment { scroll-margin-top: 52px; }
 }
 @media (max-width: 600px) {

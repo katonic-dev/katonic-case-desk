@@ -46,7 +46,7 @@ function hostOf(link) {
   }
 }
 
-// A desk may give each of its marks a tone (ok, warn, err, none) in
+// A desk may give each of its marks a tone (ok, warn, err, none, person) in
 // config.draft.markTones; without one the mark's own name is the class.
 function markClass(mark, tone) {
   return tone ? `tone-${tone}` : mark.replace(/ /g, "-") || "unknown";
@@ -679,7 +679,7 @@ function CaseView({ config, me, c, refresh }) {
   const kc = config.case || {};
   // A desk with routing shows the kind its agent was picked by, with the other details.
   const rf = config.routing && config.routing.field;
-  const detailKeys = (kc.detailFields || []).concat(rf && !metaFields(config).includes(rf) && !(kc.detailFields || []).includes(rf) ? [rf] : []);
+  const detailKeys = (kc.detailFields || []).concat(rf && !metaFields(config).includes(rf) && !(kc.detailFields || []).includes(rf) && !(kc.chipFields || []).includes(rf) ? [rf] : []);
   const facts = (keys) => withIds(keys.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "facts");
   const arrivedText = `${viaLabel(config, c.arrived_via) ? `from ${viaLabel(config, c.arrived_via)}` : `via ${c.arrived_via}`}${c.arrived_via === "officer" ? `, ${viaLabel(config, "officer") ? "entered" : "dropped in"} by ${c.requested_by.email}` : ""}, ${fmt(c.created_at)}`;
 

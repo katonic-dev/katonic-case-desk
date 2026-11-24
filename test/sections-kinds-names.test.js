@@ -315,3 +315,15 @@ test("due dates: working days run Monday to Friday; calendar days stay as they w
   assert.match(sandbox.dueOf(working, c, d("2026-12-10")).text, /^Overdue since/);
   assert.equal(sandbox.dueOf(working, { fields: { received_on: "2026-11-18", urgency: "Expedited" } }, now).days, 1, "5 working days from the 18th is the 25th, so one is left");
 });
+
+test("a letter can write its dates as 8 Dec 2026 when dateStyle is long", () => {
+  const config = JSON.parse(JSON.stringify(require("../desk.config.json")));
+  const L = { title: "T", prefix: "XX", days: 14, toField: "title", opening: "O", fields: [], dateLine: "Please send it by {until}.", body: [], signature: "S" };
+  const c = { fields: { title: "A" }, drafts: [], id: "1" };
+  const who = { email: "a@b.invalid", name: "A" };
+  const now = new Date("2026-11-24T09:00:00Z");
+  config.letters = { info_requested: { ...L } };
+  assert.ok(cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Please send it by 2026-12-08."));
+  config.letters.info_requested.dateStyle = "long";
+  assert.ok(cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Please send it by 8 Dec 2026.") && cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Date: 24 Nov 2026"));
+});
