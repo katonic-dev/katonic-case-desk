@@ -752,7 +752,7 @@ function CaseView({ config, me, c, refresh }) {
           h(
             "dl",
             { className: "meta" },
-            config.intake.fields.filter((f) => f.type !== "textarea" && f.key !== "title" && c.fields[f.key]).map((f) => [h("dt", { key: `t-${f.key}` }, f.label), h("dd", { key: `d-${f.key}` }, show(config, f.key, c.fields[f.key], true))]),
+            config.intake.fields.filter((f) => f.type !== "textarea" && f.key !== "title" && c.fields[f.key]).map((f) => [h("dt", { key: `t-${f.key}` }, f.label), h("dd", { key: `d-${f.key}` }, withIds(show(config, f.key, c.fields[f.key], true), `dd-${f.key}`))]),
             h("dt", null, "Arrived"),
             h("dd", null, arrivedText),
           ),
@@ -919,7 +919,7 @@ function CaseView({ config, me, c, refresh }) {
 
   const review = [
     // The summary earns its place only where there is no table to read.
-    latest && c.summary && !rows ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, withIds(c.summary, "su"))) : null,
+    latest && c.summary && !rows && !(editing && sections.length) ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, withIds(c.summary, "su"))) : null,
     latest
       ? editing && open
         ? sections.length
@@ -1189,7 +1189,7 @@ function App() {
     h("input", { key: "q", className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
     h("div", { key: "f", className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
     h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, withIds(c.fields.title, "lt")), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
-    shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
+    shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? (q ? "Nothing matches. Change the words, or clear the search." : "Nothing matches. Choose another filter.") : `No ${config.desk.caseNounPlural} yet.`),
     config.sweeps ? h(SweepLine, { key: "s", onOpen: () => setTab("sweeps") }) : null,
     h("p", { key: "i", className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
   ];
