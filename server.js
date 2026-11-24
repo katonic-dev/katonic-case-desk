@@ -274,7 +274,20 @@ async function createDesk(env = process.env) {
   }
   function plainAct(err) {
     const m = String(err && err.message);
-    return /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|ECONNRESET|socket hang up|network|terminated/i.test(m) ? "The agent could not be reached." : m.slice(0, 300);
+    if (/fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|ECONNRESET|socket hang up|network|terminated/i.test(m)) return "The agent could not be reached.";
+    // An error from the platform: its status and its own words, not the raw reply.
+    const http = /^the agent did not answer: HTTP (\d+) ?([\s\S]*)$/.exec(m);
+    if (http) {
+      let said = http[2].trim();
+      try {
+        const j = JSON.parse(said);
+        said = String(j.error || j.message || said);
+      } catch (e) {
+        /* not JSON: keep it */
+      }
+      return `The platform answered with an error (HTTP ${http[1]})${said ? `: ${said}` : ""}`.slice(0, 300);
+    }
+    return m.slice(0, 300);
   }
   // A case that was being carried out when the desk stopped: the answer never came. It is marked so, and can be tried again.
   async function settleStale() {

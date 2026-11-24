@@ -702,3 +702,6 @@ table.register td.c-customer, table.register td.c-entry, table.register th.c-cus
   .outcome-card { padding: 12px 14px 14px; }
   .outcome-card .answer-head .earlier { margin-left: 0; }
 }
+
+/* A long proposal is set at reading size, not display size. */
+.verdict .proposal-lead .pword.long { font-size: 18px; line-height: 1.35; }

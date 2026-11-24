@@ -250,7 +250,7 @@ function ProposalLead({ text, past }) {
   const at = t.search(/\.(\s|$)/);
   const lead = at > 0 ? t.slice(0, at + 1) : t;
   const rest = at > 0 ? t.slice(at + 1).trim() : "";
-  return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: "pword" }, withIds(lead.charAt(0).toUpperCase() + lead.slice(1), "pw")), rest ? h("span", { className: "preason" }, withIds(rest, "pn")) : null);
+  return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: `pword${lead.length > 110 ? " long" : ""}` }, withIds(lead.charAt(0).toUpperCase() + lead.slice(1), "pw")), rest ? h("span", { className: "preason" }, withIds(rest, "pn")) : null);
 }
 
 function Tally({ config, rows, only }) {
@@ -612,9 +612,9 @@ function OutcomeCard({ config, me, c, refresh }) {
     "section",
     { className: `card outcome-card state-${o.state}`, "aria-label": act.title },
     h("div", { className: "prose-title" }, act.title),
-    h("div", { className: "prose-hint" }, "Sent to the agent by ", h(Named, { me, c, email: o.by }), `, ${fmt(o.started_at)}`, standIn ? h("span", { className: "tag", title: "No real agent wrote this. The stand-in platform returns canned text so the screen can be seen." }, "stand-in agent, canned text") : null),
+    h("div", { className: "prose-hint" }, h("span", null, "Sent to the agent by ", h(Named, { me, c, email: o.by }), " on ", fmt(o.started_at)), standIn ? h("span", { className: "tag", title: "No real agent wrote this. The stand-in platform returns canned text so the screen can be seen." }, "stand-in agent, canned text") : null),
     note ? h("div", { className: `notice ${o.state === "failed" ? "bad" : o.state === "working" ? "plain" : o.state === "done" ? "ok" : ""}`, role: "status" }, o.state === "working" ? h("span", { className: "dot" }) : null, note) : null,
-    o.state === "failed" && o.error ? h("div", { className: "notice bad cause" }, h("b", null, "What the agent said: "), withIds(o.error.message, "oe")) : null,
+    o.state === "failed" && o.error ? h("div", { className: "notice bad cause" }, h("b", null, "What came back: "), withIds(o.error.message, "oe")) : null,
     o.state !== "failed" && o.error ? h("div", { className: "notice bad cause" }, h("b", null, "The last question failed: "), withIds(o.error.message, "oe"), " Nothing was undone. Ask again.") : null,
     o.answers.map((a, i) =>
       h(
@@ -959,7 +959,7 @@ function CaseView({ config, me, c, refresh }) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, h("b", { className: "declabel" }, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? h("div", { className: "decnote" }, "Note: ", withIds(c.decision.note, "dn")) : null),
+      h("div", { className: `notice ${c.decision.outcome === "issued" && (!c.outcome || c.outcome.state === "done") ? "ok" : "plain"}` }, h("b", { className: "declabel" }, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? h("div", { className: "decnote" }, "Note: ", withIds(c.decision.note, "dn")) : null),
       (config.next || {})[c.decision.outcome] ? h("p", { className: "small" }, config.next[c.decision.outcome]) : null,
     );
   } else {
@@ -1255,7 +1255,8 @@ function App() {
 
   const filters = [
     { id: "open", label: "Open", test: (c) => OPEN_STATUSES.includes(c.status) || waitingStatuses(config).includes(c.status) || ["working", "waiting", "failed"].includes(actStateOf(config, c.status)) },
-    { id: "mine", label: "Mine to decide", test: (c) => c.status === "for_review" && !(config.rules.fourEyes && c.requested_by.source !== "system" && c.requested_by.email === me.email) },
+    // Without the four-eyes rule every call for review is the person's to decide, so a second chip for it would only repeat the first.
+    ...(config.rules.fourEyes ? [{ id: "mine", label: "Mine to decide", test: (c) => c.status === "for_review" && !(config.rules.fourEyes && c.requested_by.source !== "system" && c.requested_by.email === me.email) }] : []),
     { id: "for_review", label: config.statuses.for_review, test: (c) => c.status === "for_review" },
     { id: "sent_back", label: config.statuses.sent_back, test: (c) => c.status === "sent_back" },
     ...waitingStatuses(config).map((s) => ({ id: s, label: (config.filterLabels || {})[s] || config.statuses[s] || s, test: (c) => c.status === s })),

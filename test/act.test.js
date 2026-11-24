@@ -259,7 +259,7 @@ test("an agent that cannot be reached: the decision stands, the case is not carr
     const f = (await call(base, `/api/cases/${c.id}`)).data;
     assert.equal(f.status, "not_carried_out");
     assert.equal(f.outcome.state, "failed");
-    assert.match(f.outcome.error.message, /HTTP 503/);
+    assert.equal(f.outcome.error.message, "The platform answered with an error (HTTP 503): down for now", "the platform's own words, not its raw reply");
     assert.equal(f.decision.by, "b@bank.invalid", "the decision stands");
     assert.equal(f.outcome.answers.length, 0);
     assert.equal(actCalls(calls).length, 1, "no automatic second try");
