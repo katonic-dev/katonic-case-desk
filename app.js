@@ -11,7 +11,7 @@ const BASE = window.APP_BASE || "";
 async function api(route, options) {
   const r = await fetch(`${BASE}${route}`, { headers: { "Content-Type": "application/json" }, ...options });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  if (!r.ok) throw Object.assign(new Error(data.error || `HTTP ${r.status}`), { fields: data.fields || null, errors: data.errors || null });
   return data;
 }
 
@@ -55,6 +55,17 @@ function actStateOf(config, status) {
 function Chip({ config, status }) {
   const state = actStateOf(config, status);
   return h("span", { className: `chip ${status}${state ? ` act-${state}` : ""}` }, status === "drafting" || state === "working" ? h("span", { className: "dot" }) : null, config.statuses[status] || status);
+}
+
+// A short chip for a case that needs to be seen first (case.flags). Its tone is warn, err, info, person or plain.
+function Flag({ flag }) {
+  return h("span", { className: `flag f-${flag.tone}`, title: flag.title || undefined }, flag.label);
+}
+
+// The words of the link to the issued document and of the register's icon. A desk that issues nothing
+// can set desk.documentLinkLabel; audit.linkLabel is still read.
+function documentLinkLabel(config) {
+  return (config.desk && config.desk.documentLinkLabel) || (config.audit && config.audit.linkLabel) || "Download the issued document";
 }
 
 function hostOf(link) {
@@ -236,12 +247,13 @@ function Icon({ name }) {
 // where none was given; a mark outside the list is still counted when it was given.
 function tally(config, rows, only) {
   const counts = {};
-  for (const r of rows) counts[r.mark || "unmarked"] = (counts[r.mark || "unmarked"] || 0) + 1;
+  // A heading row (draft.groupHeadings) is not a row of the review and is not counted.
+  for (const r of rows.filter((x) => !x.heading)) counts[r.mark || "unmarked"] = (counts[r.mark || "unmarked"] || 0) + 1;
   const marks = config.draft.marks || {};
   const named = Array.isArray(only) ? only.filter((k) => marks[k]) : [];
   const keys = named.length ? named.concat(Object.keys(marks).filter((k) => !named.includes(k) && counts[k])) : Object.keys(marks).filter((k) => counts[k]);
   const words = config.draft.tallyLabels || {};
-  return keys.map((k) => ({ text: `${counts[k] || 0} ${(words[k] || marks[k]).toLowerCase()}`, zero: !counts[k] })).concat(counts.unmarked ? [{ text: `${counts.unmarked} unmarked`, zero: false }] : []);
+  return keys.map((k) => ({ key: k, text: `${counts[k] || 0} ${(words[k] || marks[k]).toLowerCase()}`, zero: !counts[k] })).concat(counts.unmarked ? [{ key: "", text: `${counts.unmarked} unmarked`, zero: false }] : []);
 }
 
 // draft.proposalFirst: the proposal leads the strip, its first sentence large, the count of marks below it.
@@ -253,9 +265,25 @@ function ProposalLead({ text, past }) {
   return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: `pword${lead.length > 110 ? " long" : ""}` }, withIds(lead.charAt(0).toUpperCase() + lead.slice(1), "pw")), rest ? h("span", { className: "preason" }, withIds(rest, "pn")) : null);
 }
 
-function Tally({ config, rows, only }) {
+// draft.rowFilter: each part of the count that holds rows is a button. Pressing it shows only the rows
+// with that mark; pressing more than one shows the rows of each. `filter` is the list of marks pressed.
+function Tally({ config, rows, only, filter, onFilter }) {
   const parts = tally(config, rows, only);
-  return h("span", { className: "tally" }, parts.map((p, i) => h(React.Fragment, { key: i }, i ? ", " : "", h("span", { className: p.zero ? "zero" : undefined }, p.text))));
+  const on = config.draft.rowFilter && typeof onFilter === "function";
+  const picked = Array.isArray(filter) ? filter : [];
+  const flip = (key) => () => onFilter(picked.includes(key) ? picked.filter((k) => k !== key) : picked.concat(key));
+  return h(
+    "span",
+    { className: "tally" },
+    parts.map((p, i) =>
+      h(
+        React.Fragment,
+        { key: i },
+        i ? ", " : "",
+        on && !p.zero ? h("button", { type: "button", className: `tallypart${picked.includes(p.key) ? " on" : ""}`, "aria-pressed": picked.includes(p.key), title: picked.includes(p.key) ? "Showing only these rows. Press to stop." : "Show only these rows", onClick: flip(p.key) }, p.text) : h("span", { className: p.zero ? "zero" : undefined }, p.text),
+      ),
+    ),
+  );
 }
 
 // The gap analysis as the agent wrote it: one row per requirement when it
@@ -269,76 +297,108 @@ function rowLabel(config, key) {
 
 // A cell of a row may hold several lines, written with <br>. A line that starts
 // "Label: value" shows its label apart from the value.
+// A label is a capital letter, then letters, digits and spaces ("Corrected", "FY2024", "H1 2025").
+// A line with no label is a plain line: lines with none at all are drawn as a plain list, one line each.
 function CellText({ text, k }) {
   const lines = String(text == null ? "" : text).split(/\s*<br\s*\/?>\s*/i).map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return withIds(lines[0] || "", k);
   return lines.map((line, i) => {
-    const m = /^([A-Z][A-Za-z ]{1,24}): (.+)$/.exec(line);
-    return h("span", { key: i, className: m ? `cline l-${m[1].toLowerCase().replace(/ /g, "-")}` : "cline" }, m ? [h("span", { key: "l", className: "clabel" }, m[1]), h("span", { key: "v", className: "cval" }, withIds(m[2], `${k}${i}`))] : withIds(line, `${k}${i}`));
+    const m = /^([A-Z][A-Za-z0-9 ]{1,24}): (.+)$/.exec(line);
+    return h("span", { key: i, className: m ? `cline l-${m[1].toLowerCase().replace(/ /g, "-")}` : "cline plain" }, m ? [h("span", { key: "l", className: "clabel" }, m[1]), h("span", { key: "v", className: "cval" }, withIds(m[2], `${k}${i}`))] : withIds(line, `${k}${i}`));
   });
 }
 
-function GapRows({ config, rows }) {
+// The rows to show: all of them, or, with a filter (draft.rowFilter), only the rows with a mark that
+// was pressed. A group heading (draft.groupHeadings) stays while a row under it is shown.
+function visibleRows(rows, filter) {
+  if (!Array.isArray(filter) || !filter.length) return rows;
+  const out = [];
+  let head = null;
+  for (const r of rows) {
+    if (r.heading) {
+      head = r;
+      continue;
+    }
+    if (!filter.includes(r.mark || "")) continue;
+    if (head) out.push(head);
+    head = null;
+    out.push(r);
+  }
+  return out;
+}
+
+function GapRows({ config, rows, filter }) {
   const rl = config.draft.rowLabels || {};
+  const list = visibleRows(rows, filter);
+  // draft.stackOnPhone: on a phone the two boxes stand one above the other, each the width of the row.
+  const pairClass = config.draft.stackOnPhone ? "pair stack" : "pair";
+  const heading = (r, i) => h("div", { key: `h${i}`, className: "gaphead", role: "heading", "aria-level": 4 }, r.heading);
+  // A row's own marker: a desk's quiet marks (draft.quietMarks) draw the thin edge.
+  const rowClass = (r) => `gaprow ${markClass(r.mark, r.tone)}${(config.draft.quietMarks || []).includes(r.mark) ? " quiet" : ""}`;
   // A desk that labels the citation ("Evidence") gets its lines in two aligned columns.
   if (rl.citation) {
     const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, CellText({ text: value, k: cls })));
     return h(
       "div",
       { className: "gap" },
-      rows.map((r, i) =>
-        h(
-          "div",
-          { key: i, className: `gaprow ${markClass(r.mark, r.tone)}` },
-          h("div", { className: "n" }, r.n),
-          h(
-            "div",
-            null,
-            h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-            // draft.sideBySide: the first two values (the case's and the other record's) stand in two columns, each under its label.
-            // draft.singleValueMarks: for a row with one of these marks whose two values are the same text, one box (labelled rowLabels.both) in place of two.
-            config.draft.sideBySide && (r.source || r.policy) && (config.draft.singleValueMarks || []).includes(r.mark) && String(r.source || "").trim().toLowerCase() === String(r.policy || "").trim().toLowerCase()
-              ? h("div", { className: "pair one" }, h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.both || ""), h("span", { className: "v" }, withIds(r.source, "one"))))
-              : config.draft.sideBySide && (r.source || r.policy)
-              ? h(
-                  "div",
-                  { className: "pair" },
-                  h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.source || ""), h("span", { className: "v" }, r.source ? withIds(r.source, "src") : h("span", { className: "none" }, "none held"))),
-                  h("div", { className: "cell cell-b" }, h("span", { className: "k" }, rl.policy || ""), h("span", { className: "v" }, r.policy ? withIds(r.policy, "pol") : h("span", { className: "none" }, "none held"))),
-                )
-              : null,
-            h(
+      list.map((r, i) =>
+        r.heading
+          ? heading(r, i)
+          : h(
               "div",
-              { className: "kvs" },
-              !config.draft.sideBySide && r.source ? kv("src", rl.source || "", r.source) : null,
-              !config.draft.sideBySide && r.policy ? kv("pol", rl.policy || "", r.policy) : null,
-              // with the values side by side the reason comes first and the ids it rests on after it
-              config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
-              r.citation ? kv("evid", rl.citation, r.citation) : null,
-              !config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
+              { key: i, className: rowClass(r) },
+              h("div", { className: "n" }, r.n),
+              h(
+                "div",
+                null,
+                h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
+                // draft.sideBySide: the first two values (the case's and the other record's) stand in two columns, each under its label.
+                // draft.singleValueMarks: for a row with one of these marks whose two values are the same text, one box (labelled rowLabels.both) in place of two.
+                // A value may hold lines with labels (Label: value, written with <br>): they are drawn as in the other rows.
+                config.draft.sideBySide && (r.source || r.policy) && (config.draft.singleValueMarks || []).includes(r.mark) && String(r.source || "").trim().toLowerCase() === String(r.policy || "").trim().toLowerCase()
+                  ? h("div", { className: `${pairClass} one` }, h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.both || ""), h("span", { className: "v" }, CellText({ text: r.source, k: "one" }))))
+                  : config.draft.sideBySide && (r.source || r.policy)
+                  ? h(
+                      "div",
+                      { className: pairClass },
+                      h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.source || ""), h("span", { className: "v" }, r.source ? CellText({ text: r.source, k: "src" }) : h("span", { className: "none" }, "none held"))),
+                      h("div", { className: "cell cell-b" }, h("span", { className: "k" }, rl.policy || ""), h("span", { className: "v" }, r.policy ? CellText({ text: r.policy, k: "pol" }) : h("span", { className: "none" }, "none held"))),
+                    )
+                  : null,
+                h(
+                  "div",
+                  { className: "kvs" },
+                  !config.draft.sideBySide && r.source ? kv("src", rl.source || "", r.source) : null,
+                  !config.draft.sideBySide && r.policy ? kv("pol", rl.policy || "", r.policy) : null,
+                  // with the values side by side the reason comes first and the ids it rests on after it
+                  config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
+                  r.citation ? kv("evid", rl.citation, r.citation) : null,
+                  !config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
+                ),
+              ),
             ),
-          ),
-        ),
       ),
     );
   }
   return h(
     "div",
     { className: "gap" },
-    rows.map((r, i) =>
-      h(
-        "div",
-        { key: i, className: `gaprow ${markClass(r.mark, r.tone)}` },
-        h("div", { className: "n" }, r.n),
-        h(
-          "div",
-          null,
-          h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-          r.source ? h("div", { className: "src" }, rowLabel(config, "source"), withIds(r.source, "s")) : null,
-          h("div", { className: "pol" }, rowLabel(config, "policy"), withIds(r.policy, "p"), r.citation ? h("span", { className: rowLabel(config, "citation") ? "cite own" : "cite" }, rowLabel(config, "citation"), withIds(r.citation, "c")) : null),
-          r.check ? h("div", { className: "chk" }, h("b", null, `${rl.check || "Check"}: `), withIds(r.check, "k")) : null,
-        ),
-      ),
+    list.map((r, i) =>
+      r.heading
+        ? heading(r, i)
+        : h(
+            "div",
+            { key: i, className: rowClass(r) },
+            h("div", { className: "n" }, r.n),
+            h(
+              "div",
+              null,
+              h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
+              r.source ? h("div", { className: "src" }, rowLabel(config, "source"), withIds(r.source, "s")) : null,
+              h("div", { className: "pol" }, rowLabel(config, "policy"), withIds(r.policy, "p"), r.citation ? h("span", { className: rowLabel(config, "citation") ? "cite own" : "cite" }, rowLabel(config, "citation"), withIds(r.citation, "c")) : null),
+              r.check ? h("div", { className: "chk" }, h("b", null, `${rl.check || "Check"}: `), withIds(r.check, "k")) : null,
+            ),
+          ),
     ),
   );
 }
@@ -358,21 +418,25 @@ function Checklist({ rows }) {
   );
 }
 
-function Fields({ config, form, setForm, prefix = "f" }) {
+// errors: the faults the server found, by field key, shown beside the field. onEdit(key) is called
+// when a field is changed, so the page can clear that field's fault.
+function Fields({ config, form, setForm, prefix = "f", errors = {}, onEdit }) {
   return config.intake.fields.map((f) => {
     const id = `${prefix}-${f.key}`;
-    return h(
-      "label",
-      { key: f.key, htmlFor: id },
-      f.label + (f.required ? "" : " (optional)"),
-      f.hint ? h("span", { className: "hint" }, f.hint) : null,
-      // A field with options is a list to choose from (intake.fields[].options).
+    const change = (value) => {
+      setForm({ ...form, [f.key]: value });
+      if (onEdit) onEdit(f.key);
+    };
+    const bad = errors[f.key] || "";
+    const common = { id, name: f.key, value: form[f.key] || "", "aria-invalid": bad ? true : undefined, "aria-describedby": bad ? `${id}-err` : undefined, onChange: (e) => change(e.target.value) };
+    // A field with options is a list to choose from (intake.fields[].options).
+    const control =
       Array.isArray(f.options) && f.options.length
-        ? h("select", { id, name: f.key, value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) }, h("option", { key: "", value: "" }, "Choose one"), f.options.map((o) => h("option", { key: o, value: o }, o)))
+        ? h("select", common, h("option", { key: "", value: "" }, "Choose one"), f.options.map((o) => h("option", { key: o, value: o }, o)))
         : f.type === "textarea"
-        ? h("textarea", { id, name: f.key, value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) })
-        : h("input", { id, name: f.key, type: f.type === "date" ? "date" : "text", value: form[f.key] || "", onChange: (e) => setForm({ ...form, [f.key]: e.target.value }) }),
-    );
+        ? h("textarea", common)
+        : h("input", { ...common, type: f.type === "date" ? "date" : "text" });
+    return h("label", { key: f.key, htmlFor: id, className: bad ? "has-error" : undefined }, f.label + (f.required ? "" : " (optional)"), f.hint ? h("span", { className: "hint" }, f.hint) : null, ...(bad ? [control, h("span", { id: `${id}-err`, className: "field-error", role: "alert" }, bad)] : [control]));
   });
 }
 
@@ -381,35 +445,58 @@ function defaultsOf(config) {
   return Object.fromEntries(config.intake.fields.filter((f) => f.default).map((f) => [f.key, f.default]));
 }
 
+// What the notice under a form says about the faults the server found, one line for each kind of fault.
+// The words for each field sit beside the field itself.
+function faultLines(faults) {
+  const words = Object.values(faults || {});
+  const empty = words.filter((w) => /^Required/.test(w)).length;
+  const form = words.filter((w) => /YYYY/.test(w)).length;
+  return [empty ? `${empty === 1 ? "One field is required and empty" : `${empty} fields are required and empty`}. ${empty === 1 ? "It is" : "They are"} marked above.` : "", form ? `${form === 1 ? "One date is" : `${form} dates are`} not in the form YYYY-MM-DD. ${form === 1 ? "It is" : "They are"} marked above.` : ""].filter(Boolean);
+}
+
 function IntakeForm({ config, onCreated }) {
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(defaultsOf(config));
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
+  const [faults, setFaults] = React.useState({}); // the server's words for each field it refused, by key
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setErr("");
+    setFaults({});
     try {
       const c = await api("/api/cases", { method: "POST", body: JSON.stringify(form) });
       setForm(defaultsOf(config));
       setOpen(false);
       onCreated(c);
     } catch (ex) {
-      setErr(ex.message);
+      if (ex.fields && Object.keys(ex.fields).length) setFaults(ex.fields);
+      else setErr(ex.message);
     } finally {
       setBusy(false);
     }
   }
+  // A change to a field clears that field's fault, and the notice when no fault is left.
+  const edited = (key) => {
+    setErr("");
+    if (faults[key]) {
+      const rest = { ...faults };
+      delete rest[key];
+      setFaults(rest);
+    }
+  };
   const label = config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`;
-  const opener = h("button", { className: "btn", onClick: () => { setErr(""); setOpen(true); } }, label);
+  const opener = h("button", { className: "btn", onClick: () => { setErr(""); setFaults({}); setOpen(true); } }, label);
   if (!open) return opener;
+  const lines = faultLines(faults);
   return h(React.Fragment, null, opener, h("div", { className: "overlay", onMouseDown: (e) => { if (e.target === e.currentTarget) setOpen(false); } }, h(
     "form",
     { className: "form panel", onSubmit: submit },
     h("h2", null, label),
-    h(Fields, { config, form, setForm }),
+    h(Fields, { config, form, setForm, errors: faults, onEdit: edited }),
     err ? h("div", { className: "notice bad" }, err) : null,
+    lines.length ? h("div", { className: "notice bad faults", role: "alert" }, lines.map((l, i) => h("div", { key: i }, l))) : null,
     h(
       "div",
       { className: "row" },
@@ -679,8 +766,12 @@ function CaseView({ config, me, c, refresh }) {
   const [reply, setReply] = React.useState("");
   const [chatErr, setChatErr] = React.useState("");
   const [typed, setTyped] = React.useState({}); // a section's text as typed, so its box keeps what is being typed
+  const [rowFilter, setRowFilter] = React.useState([]); // draft.rowFilter: the marks pressed in the count above the rows
+  const [detailFaults, setDetailFaults] = React.useState({}); // the server's words for each detail it refused, by field key
   React.useEffect(() => {
     setDraft(latest ? latest.text : "");
+    setRowFilter([]);
+    setDetailFaults({});
     setTyped({});
     setEditing(false);
     setNote("");
@@ -761,12 +852,14 @@ function CaseView({ config, me, c, refresh }) {
     e.preventDefault();
     setBusy("details");
     setErr("");
+    setDetailFaults({});
     try {
       await api(`/api/cases/${c.id}`, { method: "PATCH", body: JSON.stringify(details) });
       setDetails(null);
       await refresh();
     } catch (ex) {
-      setErr(ex.message);
+      if (ex.fields && Object.keys(ex.fields).length) setDetailFaults(ex.fields);
+      else setErr(ex.message);
     } finally {
       setBusy("");
     }
@@ -803,7 +896,8 @@ function CaseView({ config, me, c, refresh }) {
         "form",
         { className: "form", onSubmit: saveDetails },
         h("h2", null, "Correct the details"),
-        h(Fields, { config, form: details, setForm: setDetails, prefix: "edit" }),
+        h(Fields, { config, form: details, setForm: setDetails, prefix: "edit", errors: detailFaults, onEdit: (key) => { if (detailFaults[key]) { const rest = { ...detailFaults }; delete rest[key]; setDetailFaults(rest); } } }),
+        Object.keys(detailFaults).length ? h("div", { className: "notice bad faults", role: "alert" }, faultLines(detailFaults).map((l, i) => h("div", { key: i }, l))) : null,
         h("div", { className: "row" }, h("button", { className: "btn primary", type: "submit", disabled: busy === "details" }, "Save"), h("button", { className: "btn quiet", type: "button", onClick: () => setDetails(null) }, "Cancel")),
       )
     : h(
@@ -831,6 +925,7 @@ function CaseView({ config, me, c, refresh }) {
           "div",
           { className: "statusline" },
           h(Chip, { config, status: c.status }),
+          c.flag ? h(Flag, { flag: c.flag }) : null,
           (kc.chipFields || []).filter((key) => c.fields[key]).map((key) => h("span", { key, className: `fact ${/expedit|urgent/i.test(c.fields[key]) ? "urgent" : ""}` }, show(config, key, c.fields[key]))),
           h(DueChip, { config, c }),
         ),
@@ -900,6 +995,8 @@ function CaseView({ config, me, c, refresh }) {
       "div",
       { className: "decide" },
       fourEyesBlocked ? h("div", { className: "notice plain" }, config.rules.fourEyesText) : null,
+      // draft.proposalNames: a row the proposal does not name. It blocks nothing.
+      c.proposal_notice ? h("div", { className: "notice plain proposal-gap", role: "status" }, c.proposal_notice) : null,
       h(
         "div",
         { className: "actions" },
@@ -925,7 +1022,7 @@ function CaseView({ config, me, c, refresh }) {
       h(
         "p",
         { className: "small decided-as" },
-        `Decided as ${me.name}. `,
+        `Deciding as ${me.name}. `,
         redo.map((d) => h("button", { key: d.id, className: "linklike", disabled: Boolean(busy) || (fourEyesBlocked && !config.rules.fourEyesAllowsRedo) || !latest, onClick: () => setChoice(choice === d.id ? "" : d.id) }, `Not ready to decide? ${d.label}`)),
       ),
     );
@@ -976,15 +1073,24 @@ function CaseView({ config, me, c, refresh }) {
   // the same strip, pinned above the rows.
   const held = Boolean(c.checklist && c.checklist.some((r) => r.blocking && r.status !== "complete"));
   const hasVerdict = latest && !editing && (c.checklist || rows);
+  // Once a person has decided, the strip leads with the decision and the agent's proposal is history.
+  const decided = Boolean(c.decision) && !open && c.status !== "sent_back";
+  const proposedId = decided ? proposedDecision({ ...config, decisions }, c.proposal) : "";
+  const decidedLead = decided && !twoPane
+    ? h("div", { className: "decidedlead" }, h("b", null, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome] || c.decision.id), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`)
+    : null;
+  const decidedDiffers = decided && proposedId && proposedId !== c.decision.id ? h("div", { className: "decideddiffers" }, "The decision differs from the agent's proposal.") : null;
   const verdict = hasVerdict
     ? h(
         "div",
-        { className: `verdict ${held ? "held" : c.all_pass === true ? "ok" : c.all_pass === false ? "attention" : "plain"}` },
+        { className: `verdict ${held ? "held" : c.all_pass === true ? "ok" : c.all_pass === false ? "attention" : "plain"}${decided ? " decided" : ""}` },
+        decided && twoPane ? h("div", { className: "verdict-decision first" }, decision) : decidedLead,
+        decidedDiffers,
         rows || c.proposal || c.next_step
           ? h(
               "div",
               { className: "headline" },
-              rows && !config.draft.proposalFirst ? h(Tally, { config: vcfg, rows, only: c.marks_allowed }) : null,
+              rows && !config.draft.proposalFirst ? h(Tally, { config: vcfg, rows, only: c.marks_allowed, filter: rowFilter, onFilter: setRowFilter }) : null,
               c.next_step
                 ? [
                     h("span", { key: "ns" }, h("b", null, "Next step by the desk's rules: "), `${c.next_step.label}, because ${c.next_step.why}.`),
@@ -994,16 +1100,16 @@ function CaseView({ config, me, c, refresh }) {
                   ]
                 : c.proposal
                   ? config.draft.proposalFirst
-                    ? h(ProposalLead, { text: c.proposal, past: closed })
-                    : h("span", null, h("b", null, "The agent proposes: "), withIds(c.proposal, "pr"))
+                    ? h(ProposalLead, { text: c.proposal, past: decided })
+                    : h("span", null, h("b", null, decided ? "The agent proposed: " : "The agent proposes: "), withIds(c.proposal, "pr"))
                   : config.draft.proposalPrefix
                     ? h("span", { className: "small" }, "The agent proposed no next step.")
                     : null,
             )
           : null,
-        rows && config.draft.proposalFirst ? h("div", { className: "headline tallyline" }, h(Tally, { config, rows, only: c.marks_allowed })) : null,
+        rows && config.draft.proposalFirst ? h("div", { className: "headline tallyline" }, h(Tally, { config, rows, only: c.marks_allowed, filter: rowFilter, onFilter: setRowFilter })) : null,
         c.checklist ? h(Checklist, { rows: c.checklist }) : null,
-        twoPane ? h("div", { className: "verdict-decision" }, decision) : null,
+        twoPane && !decided ? h("div", { className: "verdict-decision" }, decision) : null,
       )
     : null;
 
@@ -1016,7 +1122,13 @@ function CaseView({ config, me, c, refresh }) {
     standIn ? h("span", { className: "tag", title: "No real agent wrote this. The stand-in platform returns canned text so the screen can be seen." }, "stand-in agent, canned text") : null,
   );
 
+  const total = rows ? rows.filter((r) => !r.heading).length : 0;
+  const shownRows = rows ? visibleRows(rows, rowFilter).filter((r) => !r.heading).length : 0;
   const review = [
+    // draft.summaryAboveRows: the agent's summary, folded, above the table.
+    latest && !editing && c.summary && rows && config.draft.summaryAboveRows ? h("details", { key: "sumfold", className: "sumfold" }, h("summary", null, "Summary"), h("div", { className: "card" }, h("p", { className: "summary" }, withIds(c.summary, "su")))) : null,
+    // draft.rowFilter: the rows are cut to the marks pressed in the count.
+    latest && !editing && rows && config.draft.rowFilter && rowFilter.length ? h("p", { key: "rowfilter", className: "small rowfilter", role: "status" }, `Showing ${shownRows} of ${total} rows. `, h("button", { type: "button", className: "linklike", onClick: () => setRowFilter([]) }, "Show all rows")) : null,
     // The summary earns its place only where there is no table to read.
     latest && c.summary && !rows && !(editing && sections.length) ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, withIds(c.summary, "su"))) : null,
     latest
@@ -1048,7 +1160,7 @@ function CaseView({ config, me, c, refresh }) {
             ]
           : h("textarea", { key: "edit", className: "draft", value: draft, onChange: (e) => setDraft(e.target.value) })
         : rows
-          ? h(GapRows, { key: "rows", config: vcfg, rows })
+          ? h(GapRows, { key: "rows", config: vcfg, rows, filter: config.draft.rowFilter ? rowFilter : null })
           : c.checklist
             ? h("div", { key: "gate", className: "card" }, h("p", { className: "summary" }, c.gate_note || "The review stopped before the criteria were checked."))
             : h("div", { key: "prose", className: "draft" }, sections.length ? window.DeskShared.stripSections(latest.text, config) : latest.text)
@@ -1062,7 +1174,7 @@ function CaseView({ config, me, c, refresh }) {
       ? h(
           "p",
           { key: "docs", className: "docs" },
-          c.issued_document ? h("a", { href: `${BASE}/api/cases/${c.id}/issued.md` }, h(Icon, { name: "file" }), (config.audit && config.audit.linkLabel) || "Download the issued document") : null,
+          c.issued_document ? h("a", { href: `${BASE}/api/cases/${c.id}/issued.md` }, h(Icon, { name: "file" }), documentLinkLabel(config)) : null,
           (c.letters || []).map((l, i) => h("a", { key: i, href: `${BASE}/api/cases/${c.id}/letters/${i}.md` }, h(Icon, { name: "mail" }), `${((config.letters || {})[l.kind] || {}).linkLabel || "Letter"} ${l.number}`)),
         )
       : null,
@@ -1135,7 +1247,7 @@ function CaseView({ config, me, c, refresh }) {
   ];
 }
 
-function Register({ config, onOpen }) {
+function Register({ config, me, onOpen }) {
   const [rows, setRows] = React.useState([]);
   React.useEffect(() => {
     api("/api/register").then(setRows).catch(() => {});
@@ -1150,8 +1262,13 @@ function Register({ config, onOpen }) {
     if (c === "title" && onOpen) return h("a", { href: "#", onClick: (e) => { e.preventDefault(); onOpen(r.case_id); } }, r[c]);
     if (c === "arrived_via") return viaLabel(config, r[c]) || r[c];
     if (config.intake.fields.some((f) => f.key === c)) return withIds(show(config, c, r[c], true), c);
-    if (c === "decision") return h("span", null, (config.decisionLabels || {})[r[c]] || config.statuses[r[c]] || r[c], r[c] === "issued" ? [" ", h("a", { key: "l", className: "doclink", href: `${BASE}/api/cases/${r.case_id}/issued.md`, title: "Download the issued document", "aria-label": "Download the issued document" }, h(Icon, { name: "file" }))] : null);
+    if (c === "decision") return h("span", null, (config.decisionLabels || {})[r[c]] || config.statuses[r[c]] || r[c], r[c] === "issued" ? [" ", h("a", { key: "l", className: "doclink", href: `${BASE}/api/cases/${r.case_id}/issued.md`, title: documentLinkLabel(config), "aria-label": documentLinkLabel(config) }, h(Icon, { name: "file" }))] : null);
     if (c === "identity_source") return r[c] === "platform-sign-in" ? "platform sign-in" : "local";
+    // The name, with the sign-in address beneath it in small type. The export keeps the address.
+    if (c === "decided_by") {
+      const name = window.DeskShared.displayName(r[c], [{ email: me.email, name: me.name }]);
+      return name !== r[c] ? [h("span", { key: "n", className: "who" }, name), h("span", { key: "a", className: "addr" }, r[c])] : r[c];
+    }
     return withIds(String(r[c] == null ? "" : r[c]), c);
   };
   return h(
@@ -1163,7 +1280,7 @@ function Register({ config, onOpen }) {
       "table",
       { className: "register" },
       h("thead", null, h("tr", null, cols.map((c) => h("th", { key: c, className: `c-${c}` }, heading(c))))),
-      h("tbody", null, rows.map((r, i) => h("tr", { key: i }, cols.map((c) => h("td", { key: c, className: `c-${c}` }, cell(r, c)))))),
+      h("tbody", null, rows.map((r, i) => h("tr", { key: i }, cols.map((c) => h("td", { key: c, className: `c-${c}`, "data-label": heading(c) }, h("span", { className: "cv" }, cell(r, c))))))),
     ),
     rows.length ? null : h("p", { className: "small" }, "Nothing decided yet."),
   );
@@ -1292,7 +1409,7 @@ function App() {
     collapsed ? null : h("h3", { key: "h" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
     h("input", { key: "q", className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
     h("div", { key: "f", className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
-    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, withIds(c.fields.title, "lt")), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
+    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, withIds(c.fields.title, "lt")), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h("span", { className: "chips" }, h(DueChip, { config, c }), c.flag ? h(Flag, { flag: c.flag }) : null, h(Chip, { config, status: c.status })))))),
     shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? (q ? "Nothing matches. Change the words, or clear the search." : "Nothing matches. Choose another filter.") : `No ${config.desk.caseNounPlural} yet.`),
     config.sweeps ? h(SweepLine, { key: "s", onOpen: () => setTab("sweeps") }) : null,
     h("p", { key: "i", className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
@@ -1314,7 +1431,7 @@ function App() {
     tab === "sweeps" && config.sweeps
       ? h("div", { className: "columns" }, h("div", { className: "col wide narrowpage" }, h(Sweeps, { config, onOpened: async (c) => { await refresh(); pick(c.id); setFilter("all"); setTab("desk"); } })))
       : tab === "register"
-      ? h("div", { className: "columns" }, h(Register, { config, onOpen: (id) => { pick(id); setFilter("all"); setTab("desk"); } }))
+      ? h("div", { className: "columns" }, h(Register, { config, me, onOpen: (id) => { pick(id); setFilter("all"); setTab("desk"); } }))
       : h(
           "div",
           { className: `columns ${config.case && config.case.showText ? "two" : ""}` },

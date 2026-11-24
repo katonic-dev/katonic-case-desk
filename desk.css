@@ -705,3 +705,97 @@ table.register td.c-customer, table.register td.c-entry, table.register th.c-cus
 
 /* A long proposal is set at reading size, not display size. */
 .verdict .proposal-lead .pword.long { font-size: 18px; line-height: 1.35; }
+
+/* ===== Engine round 4, 24 Nov 2026 ===== */
+/* A mark with its own sign (draft.markIcons) shows that sign only, whatever its tone. */
+span.mark.has-icon::before { content: none; }
+
+/* Two values side by side (draft.sideBySide). An id stays whole, and breaks inside a narrow box only when it must. */
+.gaprow .pair .id { display: inline-block; max-width: 100%; white-space: normal; word-break: break-all; }
+.gaprow .pair .cline { gap: 8px; }
+.gaprow .pair .cline .clabel { flex-basis: 64px; }
+@media (max-width: 600px) {
+  /* draft.stackOnPhone: the two boxes stand one above the other. */
+  .gaprow .pair.stack { grid-template-columns: minmax(0, 1fr); gap: 8px 0; }
+}
+
+/* Lines in a cell: a label has one width and wraps inside it; a line with no label is a plain line. */
+.gaprow .cline.plain { display: block; }
+.gaprow .cline .clabel { min-width: 0; overflow-wrap: anywhere; }
+.gaprow .kv .k { overflow-wrap: anywhere; }
+
+/* On a phone every row's lines put the label above the value, and a label column fits twelve letters. */
+@media (max-width: 600px) {
+  .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .gaprow .kvs .kv .k { padding-top: 8px; }
+  .gaprow .cline .clabel { flex-basis: 12ch; }
+  .gaprow .pair .cline .clabel { flex-basis: 12ch; }
+}
+
+/* A desk's quiet marks (draft.quietMarks) draw the thin edge, not the stripe. */
+.gaprow.quiet { border-left-width: 1px; border-left-color: var(--line); padding-left: 15px; }
+
+/* A group heading between rows (draft.groupHeadings). */
+.gaphead { margin: 12px 0 0; padding: 0 2px 3px; font-size: var(--fs-sm); font-weight: 600; color: var(--t3); border-bottom: 1px solid var(--rule); }
+.gaphead:first-child { margin-top: 0; }
+
+/* The count above the rows as a filter (draft.rowFilter). */
+.tallypart { font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dashed var(--t4); padding: 0; margin: 0; cursor: pointer; }
+.tallypart:hover { color: var(--brand); border-bottom-color: var(--brand); }
+.tallypart.on { background: var(--brand-l); color: var(--brand); border-radius: var(--r-xs); padding: 0 5px; border-bottom-color: transparent; }
+.rowfilter { margin: 0 0 8px; }
+.sumfold { margin: 0 0 12px; }
+.sumfold > .card { margin-top: 6px; }
+
+/* The link-like button reaches 40 px on a phone. */
+@media (max-width: 600px) {
+  .linklike { display: inline-flex; align-items: center; min-height: 40px; padding: 0; }
+  .tallypart { display: inline-flex; align-items: center; min-height: 40px; }
+}
+
+/* A chip for a case that needs to be seen first (case.flags). */
+.flag { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: var(--warn-l); color: var(--warn); vertical-align: middle; }
+.flag.f-err { background: var(--err-l); color: var(--err); }
+.flag.f-info { background: var(--info-l); color: var(--info); }
+.flag.f-person { background: var(--brand-l); color: var(--brand); }
+.flag.f-plain { background: var(--rule); color: var(--t3); }
+
+/* The queue line: the facts take the room that is left, and the chips stay together on the first line. */
+.caselist .s { flex-wrap: wrap; align-items: flex-start; }
+.caselist .s > span:first-child { flex: 1 1 11em; min-width: 0; }
+.caselist .s .chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; margin-left: auto; flex: none; max-width: 100%; }
+.caselist .s .chips > span { flex: none; max-width: none; white-space: nowrap; overflow: visible; }
+
+/* Once a person has decided, the decision leads the strip and the agent's proposal is history. */
+.verdict .decidedlead { font-size: var(--fs-md); color: var(--t); margin: 0 0 8px; }
+.verdict .decidedlead b { font-size: var(--fs-read); font-weight: 600; }
+.verdict .decideddiffers { font-size: var(--fs-sm); color: var(--t3); margin: -4px 0 8px; }
+.verdict.decided .headline { color: var(--t3); }
+.verdict-decision.first { margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--rule); }
+.verdict-decision.first .decision-block .notice { margin-top: 0; }
+
+/* A proposal that leaves out a row (draft.proposalNames) is a quiet line above the buttons. */
+.notice.proposal-gap { margin: 0; }
+
+/* The new-case form: a fault sits beside its field, one line for each. */
+.form label.has-error input, .form label.has-error textarea, .form label.has-error select { border-color: var(--err); }
+.field-error { display: block; margin-top: 3px; font-size: var(--fs-sm); font-weight: 500; color: var(--err); }
+.notice.faults > div + div { margin-top: 2px; }
+
+/* The register: a person by name with the address beneath in small type. */
+table.register .who { display: block; }
+table.register .addr { display: block; font-size: 12px; color: var(--t4); overflow-wrap: anywhere; }
+
+/* The register on a phone: one card for each decision, no sideways scroll. */
+@media (max-width: 600px) {
+  table.register, table.register tbody { display: block; overflow: visible; border: 0; background: transparent; }
+  table.register thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.register tr { display: block; margin: 0 0 10px; padding: 8px 12px; background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); }
+  table.register td { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 0 10px; min-width: 0; padding: 4px 0; border: 0; white-space: normal; }
+  table.register td::before { content: attr(data-label); color: var(--t4); font-size: var(--fs-sm); }
+  table.register td:empty { display: none; }
+  table.register td:first-child { display: block; font-weight: 600; font-size: var(--fs-md); padding-bottom: 6px; }
+  table.register td:first-child::before { content: none; }
+  table.register td.c-note, table.register td.c-title, table.register td.c-customer, table.register td.c-entry { min-width: 0; }
+}
+table.register .cv { min-width: 0; overflow-wrap: anywhere; }
