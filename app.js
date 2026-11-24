@@ -697,7 +697,7 @@ function CaseView({ config, me, c, refresh }) {
         h(
           "div",
           { className: "titlerow" },
-          h("h2", null, c.fields.title),
+          h("h2", null, withIds(c.fields.title, "title")),
           closed
             ? null
             : h(
@@ -1172,7 +1172,7 @@ function App() {
     collapsed ? null : h("h3", { key: "h" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
     h("input", { key: "q", className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
     h("div", { key: "f", className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
-    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
+    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, withIds(c.fields.title, "lt")), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
     shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
     config.sweeps ? h(SweepLine, { key: "s", onOpen: () => setTab("sweeps") }) : null,
     h("p", { key: "i", className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
