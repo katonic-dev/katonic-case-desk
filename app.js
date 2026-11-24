@@ -52,9 +52,13 @@ function markClass(mark, tone) {
   return tone ? `tone-${tone}` : mark.replace(/ /g, "-") || "unknown";
 }
 
+// A desk may give a mark its own sign in config.draft.markIcons (for a mark that is
+// neither a pass nor a fail, such as "=" for a match on a list). Without one the
+// tone's sign is used.
 function Mark({ config, mark, text, tone }) {
   const label = (config.draft.marks || {})[mark] || text || "";
-  return h("span", { className: `mark ${markClass(mark, tone)}`, title: (config.draft.markHints || {})[mark] || undefined }, label);
+  const icon = (config.draft.markIcons || {})[mark];
+  return h("span", { className: `mark ${markClass(mark, tone)}${icon ? " has-icon" : ""}`, title: (config.draft.markHints || {})[mark] || undefined }, icon ? h("span", { className: "mi", "aria-hidden": true }, icon + "\u00a0") : null, label);
 }
 
 function labelOf(config, key) {
@@ -82,9 +86,12 @@ function fmtDay(value) {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function show(config, key, value) {
+// intake.fields[].shownAs, for example "Match score {value}", is used where the value stands alone
+// (the line in the list, the chips); the plain list of details shows the value.
+function show(config, key, value, plain) {
   const f = config.intake.fields.find((x) => x.key === key);
-  return f && f.type === "date" ? fmtDay(value) : value;
+  if (f && f.type === "date") return fmtDay(value);
+  return f && f.shownAs && value && !plain ? String(f.shownAs).split("{value}").join(value) : value;
 }
 
 // Where a case came from, in the desk's own words.
@@ -140,12 +147,12 @@ function DueChip({ config, c }) {
   return h("span", { className: `due ${due.tone}` }, h(Icon, { name: "clock" }), due.text);
 }
 
-// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) or a date (2026-11-19) is kept whole: it is
+// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) or a date (2026-11-19, 19 Nov 2026) is kept whole: it is
 // wrapped, not changed, so a copied id is the id. Returns the text itself when
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b/g;
+  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b/g;
   const out = [];
   let last = 0;
   let m;
@@ -212,7 +219,17 @@ function tally(config, rows, only) {
   const marks = config.draft.marks || {};
   const named = Array.isArray(only) ? only.filter((k) => marks[k]) : [];
   const keys = named.length ? named.concat(Object.keys(marks).filter((k) => !named.includes(k) && counts[k])) : Object.keys(marks).filter((k) => counts[k]);
-  return keys.map((k) => ({ text: `${counts[k] || 0} ${marks[k].toLowerCase()}`, zero: !counts[k] })).concat(counts.unmarked ? [{ text: `${counts.unmarked} unmarked`, zero: false }] : []);
+  const words = config.draft.tallyLabels || {};
+  return keys.map((k) => ({ text: `${counts[k] || 0} ${(words[k] || marks[k]).toLowerCase()}`, zero: !counts[k] })).concat(counts.unmarked ? [{ text: `${counts.unmarked} unmarked`, zero: false }] : []);
+}
+
+// draft.proposalFirst: the proposal leads the strip, its first sentence large, the count of marks below it.
+function ProposalLead({ text, past }) {
+  const t = String(text || "").trim();
+  const at = t.search(/\.(\s|$)/);
+  const lead = at > 0 ? t.slice(0, at + 1) : t;
+  const rest = at > 0 ? t.slice(at + 1).trim() : "";
+  return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: "pword" }, lead.charAt(0).toUpperCase() + lead.slice(1)), rest ? h("span", { className: "preason" }, rest) : null);
 }
 
 function Tally({ config, rows, only }) {
@@ -246,7 +263,28 @@ function GapRows({ config, rows }) {
             "div",
             null,
             h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-            h("div", { className: "kvs" }, r.source ? kv("src", rl.source || "", r.source) : null, r.policy ? kv("pol", rl.policy || "", r.policy) : null, r.citation ? kv("evid", rl.citation, r.citation) : null, r.check ? kv("chk", rl.check || "Check", r.check) : null),
+            // draft.sideBySide: the first two values (the case's and the other record's) stand in two columns, each under its label.
+            // draft.singleValueMarks: for a row with one of these marks whose two values are the same text, one box (labelled rowLabels.both) in place of two.
+            config.draft.sideBySide && (r.source || r.policy) && (config.draft.singleValueMarks || []).includes(r.mark) && String(r.source || "").trim().toLowerCase() === String(r.policy || "").trim().toLowerCase()
+              ? h("div", { className: "pair one" }, h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.both || ""), h("span", { className: "v" }, withIds(r.source, "one"))))
+              : config.draft.sideBySide && (r.source || r.policy)
+              ? h(
+                  "div",
+                  { className: "pair" },
+                  h("div", { className: "cell cell-a" }, h("span", { className: "k" }, rl.source || ""), h("span", { className: "v" }, r.source ? withIds(r.source, "src") : h("span", { className: "none" }, "none held"))),
+                  h("div", { className: "cell cell-b" }, h("span", { className: "k" }, rl.policy || ""), h("span", { className: "v" }, r.policy ? withIds(r.policy, "pol") : h("span", { className: "none" }, "none held"))),
+                )
+              : null,
+            h(
+              "div",
+              { className: "kvs" },
+              !config.draft.sideBySide && r.source ? kv("src", rl.source || "", r.source) : null,
+              !config.draft.sideBySide && r.policy ? kv("pol", rl.policy || "", r.policy) : null,
+              // with the values side by side the reason comes first and the ids it rests on after it
+              config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
+              r.citation ? kv("evid", rl.citation, r.citation) : null,
+              !config.draft.sideBySide && r.check ? kv("chk", rl.check || "Check", r.check) : null,
+            ),
           ),
         ),
       ),
@@ -510,6 +548,15 @@ function CaseView({ config, me, c, refresh }) {
   const latest = c.drafts.length ? c.drafts[c.drafts.length - 1] : null;
   const [draft, setDraft] = React.useState(latest ? latest.text : "");
   const [editing, setEditing] = React.useState(false);
+  // case.foldOnPhone: on a narrow screen the case's own text and the question box start folded, so the review is the first thing under the title.
+  const [foldChoice, setFoldChoice] = React.useState(null);
+  const [, setWidth] = React.useState(0);
+  React.useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const foldOpen = window.innerWidth > 1100 || foldChoice === true;
   const [note, setNote] = React.useState("");
   const [choice, setChoice] = React.useState(""); // the decision picked, before its note
   const [err, setErr] = React.useState("");
@@ -633,7 +680,7 @@ function CaseView({ config, me, c, refresh }) {
   // A desk with routing shows the kind its agent was picked by, with the other details.
   const rf = config.routing && config.routing.field;
   const detailKeys = (kc.detailFields || []).concat(rf && !metaFields(config).includes(rf) && !(kc.detailFields || []).includes(rf) ? [rf] : []);
-  const facts = (keys) => keys.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ");
+  const facts = (keys) => withIds(keys.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "facts");
   const arrivedText = `${viaLabel(config, c.arrived_via) ? `from ${viaLabel(config, c.arrived_via)}` : `via ${c.arrived_via}`}${c.arrived_via === "officer" ? `, ${viaLabel(config, "officer") ? "entered" : "dropped in"} by ${c.requested_by.email}` : ""}, ${fmt(c.created_at)}`;
 
   const header = details
@@ -669,7 +716,7 @@ function CaseView({ config, me, c, refresh }) {
           "div",
           { className: "statusline" },
           h(Chip, { config, status: c.status }),
-          (kc.chipFields || []).filter((key) => c.fields[key]).map((key) => h("span", { key, className: `fact ${/expedit|urgent/i.test(c.fields[key]) ? "urgent" : ""}` }, c.fields[key])),
+          (kc.chipFields || []).filter((key) => c.fields[key]).map((key) => h("span", { key, className: `fact ${/expedit|urgent/i.test(c.fields[key]) ? "urgent" : ""}` }, show(config, key, c.fields[key]))),
           h(DueChip, { config, c }),
         ),
         h("p", { className: "facts" }, facts(metaFields(config))),
@@ -689,7 +736,7 @@ function CaseView({ config, me, c, refresh }) {
           h(
             "dl",
             { className: "meta" },
-            config.intake.fields.filter((f) => f.type !== "textarea" && f.key !== "title" && c.fields[f.key]).map((f) => [h("dt", { key: `t-${f.key}` }, f.label), h("dd", { key: `d-${f.key}` }, show(config, f.key, c.fields[f.key]))]),
+            config.intake.fields.filter((f) => f.type !== "textarea" && f.key !== "title" && c.fields[f.key]).map((f) => [h("dt", { key: `t-${f.key}` }, f.label), h("dd", { key: `d-${f.key}` }, show(config, f.key, c.fields[f.key], true))]),
             h("dt", null, "Arrived"),
             h("dd", null, arrivedText),
           ),
@@ -797,7 +844,7 @@ function CaseView({ config, me, c, refresh }) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, `${(config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]} by `, h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? ` Note: ${c.decision.note}` : ""),
+      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, h("b", { className: "declabel" }, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? h("div", { className: "decnote" }, `Note: ${c.decision.note}`) : null),
       (config.next || {})[c.decision.outcome] ? h("p", { className: "small" }, config.next[c.decision.outcome]) : null,
     );
   } else {
@@ -822,7 +869,7 @@ function CaseView({ config, me, c, refresh }) {
           ? h(
               "div",
               { className: "headline" },
-              rows ? h(Tally, { config, rows, only: c.marks_allowed }) : null,
+              rows && !config.draft.proposalFirst ? h(Tally, { config, rows, only: c.marks_allowed }) : null,
               c.next_step
                 ? [
                     h("span", { key: "ns" }, h("b", null, "Next step by the desk's rules: "), `${c.next_step.label}, because ${c.next_step.why}.`),
@@ -831,12 +878,15 @@ function CaseView({ config, me, c, refresh }) {
                       : null,
                   ]
                 : c.proposal
-                  ? h("span", null, h("b", null, "The agent proposes: "), c.proposal)
+                  ? config.draft.proposalFirst
+                    ? h(ProposalLead, { text: c.proposal, past: closed })
+                    : h("span", null, h("b", null, "The agent proposes: "), c.proposal)
                   : config.draft.proposalPrefix
                     ? h("span", { className: "small" }, "The agent proposed no next step.")
                     : null,
             )
           : null,
+        rows && config.draft.proposalFirst ? h("div", { className: "headline tallyline" }, h(Tally, { config, rows, only: c.marks_allowed })) : null,
         c.checklist ? h(Checklist, { rows: c.checklist }) : null,
         twoPane ? h("div", { className: "verdict-decision" }, decision) : null,
       )
@@ -918,7 +968,7 @@ function CaseView({ config, me, c, refresh }) {
       const arrived = /^arrived via (\w+)$/.exec(e.what);
       const from = arrived && viaLabel(config, arrived[1]);
       const plainVia = arrived && e.who === arrived[1] ? { feed: "Arrived from the feed", sweep: "Found by a sweep" }[arrived[1]] : "";
-      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : plainVia ? h("span", null, plainVia) : h("span", null, h("span", { className: "who" }, h(Named, { me, c, email: e.who })), " ", e.what));
+      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : plainVia ? h("span", null, plainVia) : h("span", null, h("span", { className: "who" }, h(Named, { me, c, email: e.who })), " ", withIds(e.what, `ev${i}`)));
     })),
   ];
 
@@ -944,7 +994,20 @@ function CaseView({ config, me, c, refresh }) {
     const jump = (id) => () => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
     return [
       h("div", { key: "jump", className: "jump", role: "group", "aria-label": "Jump to" }, h("button", { className: "btn quiet", onClick: jump("pane-questionnaire") }, jumpLabels(config)[0]), h("button", { className: "btn quiet", onClick: jump("pane-assessment") }, jumpLabels(config)[1])),
-      h("div", { key: "source", id: "pane-questionnaire", className: "col source" }, header, supplied, chat),
+      h(
+        "div",
+        { key: "source", id: "pane-questionnaire", className: "col source" },
+        header,
+        kc.foldOnPhone
+          ? h(
+              "details",
+              { className: "fold", open: foldOpen },
+              h("summary", { className: "foldsum", onClick: (e) => { e.preventDefault(); setFoldChoice(!foldOpen); } }, h("span", null, kc.textHeading || labelOf(config, kc.showText)), h("span", { className: "foldhint", "aria-hidden": true }, foldOpen ? "Hide" : "Read")),
+              supplied,
+              chat,
+            )
+          : [supplied, chat],
+      ),
       h("div", { key: "review", id: "pane-assessment", className: "col review" }, notices, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
     ];
   }
@@ -968,10 +1031,10 @@ function Register({ config, onOpen }) {
     if (c === "decided_at") return fmt(r[c]);
     if (c === "title" && onOpen) return h("a", { href: "#", onClick: (e) => { e.preventDefault(); onOpen(r.case_id); } }, r[c]);
     if (c === "arrived_via") return viaLabel(config, r[c]) || r[c];
-    if (config.intake.fields.some((f) => f.key === c)) return show(config, c, r[c]);
+    if (config.intake.fields.some((f) => f.key === c)) return withIds(show(config, c, r[c], true), c);
     if (c === "decision") return h("span", null, (config.decisionLabels || {})[r[c]] || config.statuses[r[c]] || r[c], r[c] === "issued" ? [" ", h("a", { key: "l", className: "doclink", href: `${BASE}/api/cases/${r.case_id}/issued.md`, title: "Download the issued document", "aria-label": "Download the issued document" }, h(Icon, { name: "file" }))] : null);
     if (c === "identity_source") return r[c] === "platform-sign-in" ? "platform sign-in" : "local";
-    return String(r[c] == null ? "" : r[c]);
+    return withIds(String(r[c] == null ? "" : r[c]), c);
   };
   return h(
     "div",
@@ -1109,7 +1172,7 @@ function App() {
     collapsed ? null : h("h3", { key: "h" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
     h("input", { key: "q", className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
     h("div", { key: "f", className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
-    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
+    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, withIds(listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "line")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
     shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
     config.sweeps ? h(SweepLine, { key: "s", onOpen: () => setTab("sweeps") }) : null,
     h("p", { key: "i", className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),

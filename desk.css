@@ -579,3 +579,57 @@ textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; 
   .queue-body { padding: 14px 16px 24px; }
   .queue:not([open]) > .queue-body { display: none; }
 }
+
+/* A mark with its own sign (draft.markIcons) does not take the tone's sign. */
+.mark.has-icon::before { content: none; }
+.mark .mi { font-weight: 600; }
+/* draft.sideBySide: the two values of a row stand in two columns, each under its label. */
+.gaprow .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 10px; margin-top: 8px; }
+.gaprow .pair .cell { min-width: 0; padding: 6px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--rule); }
+.gaprow .pair .k { display: block; font-size: 12px; color: var(--t4); margin-bottom: 1px; }
+.gaprow .pair .v { display: block; font-size: var(--fs-md); color: var(--t); line-height: 1.4; overflow-wrap: anywhere; }
+.gaprow .pair .v .none { color: var(--t4); font-style: italic; }
+.gaprow .pair + .kvs { margin-top: 8px; }
+/* draft.proposalFirst: the proposal leads the strip. */
+.verdict .proposal-lead { display: block; }
+.verdict .proposal-lead .plabel { display: block; font-size: var(--fs-sm); color: var(--t4); letter-spacing: 0.02em; }
+.verdict .proposal-lead .pword { display: block; font-family: var(--serif); font-size: 22px; font-weight: 600; line-height: 1.25; color: var(--t); margin: 1px 0 3px; }
+.verdict .proposal-lead .preason { display: block; color: var(--t2); }
+.verdict .headline.tallyline { margin-top: 8px; font-size: var(--fs-sm); }
+.verdict .headline.tallyline .tally { color: var(--t3); font-weight: 500; }
+.gaprow .pair.one { grid-template-columns: minmax(0, 1fr); }
+/* case.foldOnPhone: a fold with a heading on a narrow screen, and no fold at all on a wide one. */
+.fold > summary.foldsum { display: none; }
+@media (max-width: 1100px) {
+  .fold > summary.foldsum { display: flex; align-items: center; min-height: 40px; margin: 8px 0 0; font-weight: 600; font-size: var(--fs-md); color: var(--t); cursor: pointer; border-top: 1px solid var(--rule); }
+  .fold > h3:first-of-type { display: none; }
+  .fold[open] > summary.foldsum { margin-bottom: 4px; }
+}
+/* Tap targets of 40 px on a phone. */
+@media (max-width: 600px) {
+  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu summary { min-height: 40px; }
+  .btn, .decide .actions .btn { min-height: 40px; }
+}
+@media (max-width: 600px) {
+  .menu summary { width: 40px; height: 40px; }
+}
+.decision-block .notice .declabel { font-size: var(--fs-read); font-weight: 600; color: var(--t); }
+.decision-block .notice .decnote { margin-top: 4px; white-space: pre-wrap; }
+/* With the values side by side the ids a row rests on are a quiet last line. */
+.gaprow .pair ~ .kvs .kv.evid .k { color: var(--t4); }
+.gaprow .pair ~ .kvs .kv.evid .v { font-size: var(--fs-sm); color: var(--t4); }
+.fold > summary.foldsum { list-style: none; }
+.fold > summary.foldsum::-webkit-details-marker { display: none; }
+@media (max-width: 1100px) {
+  .fold > summary.foldsum { justify-content: space-between; }
+  .fold > summary.foldsum .foldhint { font-weight: 500; font-size: var(--fs-sm); color: var(--brand); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--s); }
+}
+/* A line in the list that is longer than the column wraps; an id or a date in it stays whole. */
+.caselist .s span:first-child { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+/* Once the officer has decided, the agent's proposal is history: smaller, and the decision is what stands out. */
+.verdict .proposal-lead.past .pword { font-size: var(--fs-read); margin: 0 0 2px; }
+/* The register: ids and notes get room; only a title column is wide by default. */
+.register td:first-child { min-width: 0; }
+.register th.c-title, .register td.c-title { min-width: 220px; }
+table.register td.c-note, table.register th.c-note { min-width: 260px; }
+table.register td.c-customer, table.register td.c-entry, table.register th.c-customer, table.register th.c-entry { min-width: 150px; }

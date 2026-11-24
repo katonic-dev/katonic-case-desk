@@ -208,6 +208,18 @@ When the agent's reply has a line that is exactly `heading`, after the table, th
 - A record id such as `DOC-8203` or `LD-20261123-6A10E8`, and a date such as `2026-11-19`, never breaks across lines. Figures in rows line up.
 - On a screen narrower than 1100 px, with a case open, the queue is one row that names it and shows the count. A tap opens it.
 
+**Marks that are neither a pass nor a fail.** A desk that compares two records (a screening desk) can set `draft.markIcons`, a sign for each mark (`=`, `≈`, `≠`, `–`, `•`), which takes the place of the tick, half circle, cross and question mark that the tone would give. A mark with a sign is drawn with that sign only. `draft.markTones` still picks the colour. `draft.tallyLabels` gives the words the count of marks uses, for example `"differs": "differ"` so that it reads "5 differ".
+
+**Two values side by side.** With `draft.sideBySide: true`, the first two values of a row (the case's and the other record's, labelled by `draft.rowLabels.source` and `.policy`) stand in two boxes of equal width, each under its label, with the reason first and the ids the row rests on after it, in smaller type. A value that is missing reads "none held". `draft.singleValueMarks` is a list of marks (for example `["noted"]`) whose row shows one box, labelled `draft.rowLabels.both`, when the two values are the same text.
+
+**The proposal first.** With `draft.proposalFirst: true`, the strip above the rows leads with "The agent proposes" and the first sentence of the proposal in large type, then the rest of it, then the count of marks. When the case is decided it reads "The agent proposed" in smaller type.
+
+**Words round a bare number.** `intake.fields[].shownAs` is a text with `{value}` in it, for example `"Match score {value}"`. It is used where the value stands alone (the chips under the title, the line in the list). The list of details and the register show the value.
+
+**The alert text on a phone.** With `case.foldOnPhone: true`, on a screen narrower than 1100 px the case's own text and the question box sit under a heading that opens and closes them, closed at first, so the review is what the reader sees under the title.
+
+Dates written like 21 Jul 1990 are kept whole across line ends, as ids and 2026-11-19 are. In a decided case the history reads with the desk's own past-tense label (`decisionLabels`) where it has one, for example "escalated: ...".
+
 ## What is real and what is a stand-in
 
 | Piece | State |
