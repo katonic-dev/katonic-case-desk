@@ -153,8 +153,62 @@ function cannedFromFile(desk, text) {
   return [`[Stand-in agent: canned text so the screen can be seen without a platform. Not a real ${noun}.${redo ? ` This is the redo; the note was: "${note}".` : ""}]`, "", body].join("\n");
 }
 
-function canned(text, sessionId, env = process.env) {
+// A decision the agent carries out. The desk sends one message with the heading
+// THE PROPOSAL AS CONFIRMED, and the message that asks for the outcome again
+// has THE EARLIER OUTCOME. The file's "actions" and "followUps" are keyed like
+// "replies" (a part of the case title); a follow-up may be a list, one answer
+// for each time it is asked. "actionDefault" and "followUpDefault" answer any
+// other case. "failActionOnce" lists keys whose first request is answered with
+// an error, so the failure can be tried.
+const STAND_IN_STATE = { failed: new Set(), asked: new Map() };
+
+function actKind(text) {
+  if (text.includes("THE EARLIER OUTCOME")) return "followUps";
+  if (text.includes("THE PROPOSAL AS CONFIRMED")) return "actions";
+  return "";
+}
+
+function titleLineOf(config, text) {
+  const titleField = config.intake.fields.find((f) => f.key === "title");
+  const label = (titleField ? titleField.label : "Title") + ": ";
+  return (text.split(/\r?\n/).find((l) => l.startsWith(label)) || text).toLowerCase();
+}
+
+function keyIn(map, line) {
+  return Object.keys(map || {}).find((k) => line.includes(k.toLowerCase()));
+}
+
+function cannedAct(desk, text, state = STAND_IN_STATE) {
+  const kind = actKind(text);
+  if (!kind) return null;
+  const { config, replies } = desk;
+  const line = titleLineOf(config, text);
+  const key = keyIn(replies[kind], line);
+  let body = key ? replies[kind][key] : replies[kind === "actions" ? "actionDefault" : "followUpDefault"];
+  if (Array.isArray(body)) {
+    const id = `${kind}:${key}:${line}`;
+    const n = state.asked.get(id) || 0;
+    state.asked.set(id, n + 1);
+    body = body[Math.min(n, body.length - 1)];
+  }
+  const head = "[Stand-in agent: canned text so the screen can be seen without a platform. Not a real outcome from the bank's systems.]";
+  return [head, "", body || "The stand-in has no outcome for this case. Nothing was changed."].join("\n");
+}
+
+// True the first time an act message arrives for a key in failActionOnce.
+function shouldFailOnce(desk, text, state = STAND_IN_STATE) {
+  if (actKind(text) !== "actions") return false;
+  const line = titleLineOf(desk.config, text);
+  const key = (desk.replies.failActionOnce || []).find((k) => line.includes(String(k).toLowerCase()));
+  if (!key || state.failed.has(key)) return false;
+  state.failed.add(key);
+  return true;
+}
+
+function canned(text, sessionId, env = process.env, state = STAND_IN_STATE) {
   const desk = loadDesk(env);
+  const act = desk ? cannedAct(desk, text, state) : null;
+  if (act) return act;
   const own = desk ? cannedFromFile(desk, text) : null;
   if (own) return own;
   if (text.includes("THE PRIOR AUTHORISATION REQUEST") && !text.includes("THE QUESTION")) return cannedPriorAuth(text);
@@ -185,6 +239,7 @@ function canned(text, sessionId, env = process.env) {
 }
 
 function createServer(env = process.env) {
+  const state = { failed: new Set(), asked: new Map() };
   return http.createServer((req, res) => {
     let raw = "";
     req.on("data", (c) => (raw += c));
@@ -193,7 +248,12 @@ function createServer(env = process.env) {
       if (req.url === "/public/v1/chat" && req.method === "POST") {
         const text = body.messages && body.messages[0] ? body.messages[0].content : "";
         const sid = body.session_id || `fake-session-${Date.now()}`;
-        const reply = canned(text, body.session_id, env);
+        const desk = loadDesk(env);
+        if (desk && shouldFailOnce(desk, text, state)) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "the stand-in was told to fail this request once" }));
+        }
+        const reply = canned(text, body.session_id, env, state);
         res.writeHead(200, { "Content-Type": "text/event-stream" });
         res.write(`data: ${JSON.stringify({ type: "RUN_STARTED", thread_id: sid, run_id: `fake-run-${Date.now()}` })}\n\n`);
         const pieces = reply.match(/.{1,40}/gs) || [];
