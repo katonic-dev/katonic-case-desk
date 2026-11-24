@@ -188,6 +188,8 @@ its replies come from `demo-replies.json`.
 
 `decisions` is a list of decision ids. A case of that kind shows only those buttons, and the server refuses any other decision with a message (HTTP 409). `marks` is a list of mark names. The count above the rows lists those marks, with a zero where none was given. A mark that the agent gave outside the list is still counted. A kind with no list, a kind that is not named, and a desk with no `routing` show every decision and every mark.
 
+**Wording for a kind of work.** A kind can also give its own `markLabels`, `markHints`, `markTones` and `rowLabels`, each laid over the desk's setting of the same name, key by key. A media screening can say "Adverse" where an alert investigation says "Supports concern", and label the lines of its rows "Article" and "Who it is about". A mark's tone is `ok`, `warn`, `err`, `none`, `info` (a row about someone or something apart, in blue, with no tick or cross) or `plain` (background, in grey). An address in a row (http or https) is shown as a link.
+
 **A place for a long piece of writing.** Add objects to `draft.sections`, after the plain names the list may already hold:
 
 ```json
