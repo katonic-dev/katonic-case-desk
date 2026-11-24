@@ -152,7 +152,7 @@ function DueChip({ config, c }) {
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|[A-Z]{2,}(?:-[A-Z0-9]+)+|\d{4}-\d{2}-\d{2}|\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}/g;
+  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b/g;
   const out = [];
   let last = 0;
   let m;
