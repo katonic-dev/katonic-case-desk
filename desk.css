@@ -807,3 +807,5 @@ table.register .cv { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   table.register td:has(> .cv:empty) { display: none; }
 }
+/* An id in the queue line stays whole, also when it starts the line. */
+.caselist .s span.id, .caselist .s span.id:first-child { white-space: nowrap; overflow-wrap: normal; max-width: none; }
