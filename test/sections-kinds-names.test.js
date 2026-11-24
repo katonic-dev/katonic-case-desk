@@ -29,7 +29,7 @@ function lift(name) {
 const node = (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity) });
 const sandbox = { h: node, React: { Fragment: "fragment", createElement: node } };
 vm.createContext(sandbox);
-vm.runInContext(["markClass", "Mark", "rowLabel", "withIds", "tally", "GapRows", "addWorkingDays", "workingDaysBetween", "dueOf", "fmtDay"].map(lift).join("\n"), sandbox);
+vm.runInContext(["markClass", "Mark", "rowLabel", "CellText", "withIds", "tally", "GapRows", "addWorkingDays", "workingDaysBetween", "dueOf", "fmtDay"].map(lift).join("\n"), sandbox);
 const textOf = (n) => (n == null ? "" : typeof n === "string" ? n : n.kids.map(textOf).join(""));
 const find = (n, pred, out = []) => {
   if (n && typeof n === "object") {
@@ -326,4 +326,45 @@ test("a letter can write its dates as 8 Dec 2026 when dateStyle is long", () => 
   assert.ok(cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Please send it by 2026-12-08."));
   config.letters.info_requested.dateStyle = "long";
   assert.ok(cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Please send it by 8 Dec 2026.") && cases.letterFor(config, c, { outcome: "info_requested" }, who, "x", now).text.includes("Date: 24 Nov 2026"));
+});
+
+// ----- amounts and codes kept whole, cells with several lines, labels for each kind
+test("an amount with its currency and a long code of capitals and digits are wrapped whole", () => {
+  const out = sandbox.withIds("Sent USD 1,850.00 to XB82BRVN73201150000124 at TESLXTT1, not USD 37.50. Fee, USD 4,200, then 12 items.", "t");
+  const ids = out.filter((x) => typeof x === "object").map(textOf);
+  assert.deepEqual(Array.from(ids), ["USD 1,850.00", "XB82BRVN73201150000124", "TESLXTT1", "USD 37.50", "USD 4,200"]);
+  assert.equal(out.map(textOf).join(""), "Sent USD 1,850.00 to XB82BRVN73201150000124 at TESLXTT1, not USD 37.50. Fee, USD 4,200, then 12 items.");
+  assert.equal(sandbox.withIds("Plain words only, ACSC and AC04.", "t"), "Plain words only, ACSC and AC04.", "short codes are left alone");
+});
+
+test("a cell with <br> shows one line each, and a line that starts Label: shows the label apart", () => {
+  const cls = (n, c) => find(n, (x) => x.props && typeof x.props.className === "string" && x.props.className.split(" ").includes(c)).map(textOf);
+  const tree = sandbox.CellText({ text: "Held: XB82BRVN73201150000124<br>Corrected: XB82BRVN73201150000142<br />Rest of it", k: "p" });
+  assert.equal(tree.length, 3);
+  const box = node("div", {}, tree);
+  assert.deepEqual(Array.from(cls(box, "clabel")), ["Held", "Corrected"]);
+  assert.deepEqual(Array.from(cls(box, "cval")), ["XB82BRVN73201150000124", "XB82BRVN73201150000142"]);
+  assert.equal(sandbox.CellText({ text: "One line. Note: not a label line", k: "p" }), "One line. Note: not a label line", "one line stays as it was");
+});
+
+test("a kind of work can carry its own row labels (through lookConfig, the one way)", () => {
+  const config = { draft: { rowLabels: { source: "Evidence", citation: "Rule and source", check: "Note" } }, routing: { field: "kind", kinds: { A: { rowLabels: { citation: "Rule" } }, B: {} } } };
+  const row = { n: "1", requirement: "Req", source: "Src", policy: "Pol", citation: "Cit", check: "Look", mark: "", markText: "", tone: "" };
+  const labels = (kind) => find(sandbox.GapRows({ config: cases.lookConfig(config, { fields: { kind } }), rows: [row] }), (n) => n.props && n.props.className === "k").map(textOf);
+  assert.deepEqual(Array.from(labels("B")), ["Evidence", "", "Rule and source", "Note"]);
+  assert.deepEqual(Array.from(labels("A")), ["Evidence", "", "Rule", "Note"]);
+});
+
+test("the story of a case names a decision in the past tense where the desk gives the outcome a label, else by the button's label", () => {
+  const who = { email: "r@x.invalid", source: "stand-in" };
+  const mk = () => ({ ...fake("Standard"), status: "for_review", requested_by: { email: "feed", source: "system" }, conversation: [], events: [], drafts: [{ version: 1, text: "x", by: "agent" }] });
+  const withLabels = { ...ROUTED, decisionLabels: { sent_back: "Asked the agent to redo the review" } };
+  const a = mk();
+  cases.applyDecision(withLabels, a, "send_back", who, "Cite clause 4");
+  assert.equal(a.events[a.events.length - 1].what, "asked the agent to redo the review: Cite clause 4");
+  const b = mk();
+  const bare = { ...ROUTED, decisionLabels: {} };
+  cases.applyDecision(bare, b, "send_back", who, "Cite clause 4");
+  assert.match(b.events[b.events.length - 1].what, /^[a-z]/);
+  assert.match(b.events[b.events.length - 1].what, /: Cite clause 4$/);
 });

@@ -18,7 +18,7 @@ function lift(name) {
 const node = (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity) });
 const sandbox = { h: node, React: { Fragment: "fragment", createElement: node } };
 vm.createContext(sandbox);
-vm.runInContext(["markClass", "Mark", "rowLabel", "withIds", "tally", "GapRows", "fmtDay", "show", "ProposalLead"].map(lift).join("\n"), sandbox);
+vm.runInContext(["markClass", "Mark", "rowLabel", "CellText", "withIds", "tally", "GapRows", "fmtDay", "show", "ProposalLead"].map(lift).join("\n"), sandbox);
 const textOf = (n) => (n == null ? "" : typeof n === "string" ? n : (n.kids || []).map(textOf).join(""));
 const find = (n, pred, out = []) => {
   if (n && typeof n === "object") {

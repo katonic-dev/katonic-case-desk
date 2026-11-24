@@ -152,7 +152,9 @@ function DueChip({ config, c }) {
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b/g;
+  // Also kept whole: an amount with its currency (USD 25,000.00), and a long code that mixes
+  // capitals and digits, such as an IBAN or a bank identifier.
+  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b|\b[A-Z]{3} \d(?:[\d,]*\d)?(?:\.\d+)?|\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{8,34}\b/g;
   const out = [];
   let last = 0;
   let m;
@@ -246,11 +248,22 @@ function rowLabel(config, key) {
   return t ? h("span", { className: "lbl" }, t) : null;
 }
 
+// A cell of a row may hold several lines, written with <br>. A line that starts
+// "Label: value" shows its label apart from the value.
+function CellText({ text, k }) {
+  const lines = String(text == null ? "" : text).split(/\s*<br\s*\/?>\s*/i).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return withIds(lines[0] || "", k);
+  return lines.map((line, i) => {
+    const m = /^([A-Z][A-Za-z ]{1,24}): (.+)$/.exec(line);
+    return h("span", { key: i, className: m ? `cline l-${m[1].toLowerCase().replace(/ /g, "-")}` : "cline" }, m ? [h("span", { key: "l", className: "clabel" }, m[1]), h("span", { key: "v", className: "cval" }, withIds(m[2], `${k}${i}`))] : withIds(line, `${k}${i}`));
+  });
+}
+
 function GapRows({ config, rows }) {
   const rl = config.draft.rowLabels || {};
   // A desk that labels the citation ("Evidence") gets its lines in two aligned columns.
   if (rl.citation) {
-    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, withIds(value, cls)));
+    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, CellText({ text: value, k: cls })));
     return h(
       "div",
       { className: "gap" },

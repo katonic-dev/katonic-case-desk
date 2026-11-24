@@ -614,13 +614,14 @@ textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; 
   .fold > h3:first-of-type { display: none; }
   .fold[open] > summary.foldsum { margin-bottom: 4px; }
 }
-/* Tap targets of 40 px on a phone. */
+/* Tap targets of 40 px on a phone: every control, the fold-out headings and the link-like buttons. */
 @media (max-width: 600px) {
-  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu summary { min-height: 40px; }
-  .btn, .decide .actions .btn { min-height: 40px; }
-}
-@media (max-width: 600px) {
+  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu summary, .menu-items .btn, .btn, .btn.tiny { min-height: 40px; }
+  .decide .actions .btn { min-height: 44px; }
   .menu summary { width: 40px; height: 40px; }
+  .menu-items { top: 44px; }
+  details:not(.queue):not(.menu) > summary { padding: 11px 0; }
+  .linklike { display: inline-block; padding: 10px 0; text-align: left; }
 }
 .decision-block .notice .declabel { font-size: var(--fs-read); font-weight: 600; color: var(--t); }
 .decision-block .notice .decnote { margin-top: 4px; white-space: pre-wrap; }
@@ -654,18 +655,22 @@ table.register td.c-customer, table.register td.c-entry, table.register th.c-cus
 /* An address in a row is a link the person can follow. */
 .gaprow a.ext { color: var(--brand); overflow-wrap: anywhere; }
 
-/* On a phone every control can be tapped: at least 40 px high. */
-@media (max-width: 600px) {
-  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu-items .btn { min-height: 40px; }
-  .menu summary { width: 40px; height: 40px; }
-  .menu-items { top: 44px; }
-}
-
 /* On a phone the mark sits above the title of a row, so the title keeps the width. */
 @media (max-width: 600px) {
   .gaprow .req { flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
 }
 
+/* A cell of a row with several lines, each with its own label (Held, Corrected, Source). */
+.gaprow .cline { display: flex; gap: 10px; align-items: baseline; }
+.gaprow .cline + .cline { margin-top: 2px; }
+.gaprow .cline .clabel { flex: 0 0 72px; font-size: var(--fs-sm); color: var(--t4); }
+.gaprow .cline .cval { min-width: 0; }
+.gaprow .cline.l-held .cval { color: var(--t3); }
+.gaprow .cline.l-corrected .cval { color: var(--t); font-weight: 600; }
+
+/* On a phone a row's lines with labels (Held, Corrected, Source) stack and keep their value whole. */
 @media (max-width: 600px) {
-  .btn, .decide .actions .btn { min-height: 40px; }
+  .gap:has(.cline) .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .gap:has(.cline) .gaprow .kv .k { padding-top: 8px; }
+  .gaprow .cline .clabel { flex-basis: 64px; }
 }
