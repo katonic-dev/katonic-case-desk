@@ -804,3 +804,6 @@ table.register .cv { min-width: 0; overflow-wrap: anywhere; }
   .gaprow .pair:not(.stack) .cline { flex-direction: column; gap: 0; }
   .gaprow .pair:not(.stack) .cline .clabel { flex: none; }
 }
+@media (max-width: 600px) {
+  table.register td:has(> .cv:empty) { display: none; }
+}
