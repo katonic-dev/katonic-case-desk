@@ -175,7 +175,7 @@ async function createDesk(env = process.env) {
   async function runDraft(c, by) {
     const statusBefore = c.status;
     c.status = "drafting";
-    c.events.push({ at: new Date().toISOString(), who: by, what: "draft requested from the agent" });
+    c.events.push({ at: new Date().toISOString(), who: by, what: "asked the agent for a draft" });
     await store.putCase(c);
     const p = (async () => {
       try {
