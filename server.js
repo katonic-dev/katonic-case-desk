@@ -31,6 +31,7 @@ const DEFAULT_CONFIG = loadConfig({});
 const FILES = {
   "/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
   "/desk.css": { file: "desk.css", type: "text/css; charset=utf-8" },
+  "/shared.js": { file: "lib/page-shared.js", type: "text/javascript; charset=utf-8" },
   "/vendor/react.js": { file: "node_modules/react/umd/react.production.min.js", type: "text/javascript; charset=utf-8" },
   "/vendor/react-dom.js": { file: "node_modules/react-dom/umd/react-dom.production.min.js", type: "text/javascript; charset=utf-8" },
 };
@@ -50,6 +51,7 @@ function page(base, name) {
   <script>window.APP_BASE = ${JSON.stringify(base)};</script>
   <script src="${base}/vendor/react.js"></script>
   <script src="${base}/vendor/react-dom.js"></script>
+  <script src="${base}/shared.js"></script>
   <script src="${base}/app.js"></script>
 </body>
 </html>
@@ -143,8 +145,14 @@ async function createDesk(env = process.env) {
   // one and the text when there is not.
   function caseOut(c) {
     const latest = c.drafts.length ? c.drafts[c.drafts.length - 1] : null;
+    const rules = cases.kindRules(CONFIG, c);
     return {
       ...c,
+      // What this kind of work shows: null means every decision, every mark.
+      kind: rules.kind,
+      decisions_allowed: rules.decisions,
+      marks_allowed: rules.marks,
+      sections: latest ? cases.parseSections(latest.text, CONFIG) : [],
       gap_rows: latest ? cases.parseGapTable(latest.text, CONFIG) : null,
       summary: latest ? cases.summaryOf(latest.text, CONFIG).split("**").join("") : "",
       proposal: latest ? cases.proposalOf(latest.text, CONFIG) : "",
