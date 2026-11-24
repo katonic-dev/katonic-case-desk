@@ -31,6 +31,8 @@
   --warn-l: #fbf0e3;
   --err: #a3332f;
   --err-l: #fbe9e8;
+  --info: #2b5fa5;
+  --info-l: #e6eefa;
   --fs-sm: 11px;
   --fs-base: 12px;
   --fs-md: 13px;
@@ -403,6 +405,8 @@ details summary { font-size: var(--fs-sm); }
     --warn-l: #33271a;
     --err: #f09690;
     --err-l: #3a201e;
+    --info: #92b7ee;
+    --info-l: #1c2a40;
     --pin: rgba(0, 0, 0, 0.55);
   }
 }
@@ -424,6 +428,8 @@ details summary { font-size: var(--fs-sm); }
   --warn-l: #33271a;
   --err: #f09690;
   --err-l: #3a201e;
+  --info: #92b7ee;
+  --info-l: #1c2a40;
   --pin: rgba(0, 0, 0, 0.55);
 }
 
@@ -636,3 +642,30 @@ textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; 
 .register th.c-title, .register td.c-title { min-width: 220px; }
 table.register td.c-note, table.register th.c-note { min-width: 260px; }
 table.register td.c-customer, table.register td.c-entry, table.register th.c-customer, table.register th.c-entry { min-width: 150px; }
+/* Two more tones for a mark. "info" is for a row about someone else or something
+   apart (a namesake), "plain" for background that bears on nothing. Neither is a
+   pass or a failure, so neither takes a tick or a cross. */
+.gaprow.tone-info { border-left-color: var(--info); border-left-width: 4px; padding-left: 12px; }
+.gaprow.tone-plain { border-left-color: var(--line); }
+.mark.tone-info { background: var(--info-l); color: var(--info); }
+.mark.tone-plain { background: var(--rule); color: var(--t3); }
+.mark.tone-info::before { content: "\2260\00a0"; }
+.mark.tone-plain::before { content: "\2013\00a0"; }
+/* An address in a row is a link the person can follow. */
+.gaprow a.ext { color: var(--brand); overflow-wrap: anywhere; }
+
+/* On a phone every control can be tapped: at least 40 px high. */
+@media (max-width: 600px) {
+  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu-items .btn { min-height: 40px; }
+  .menu summary { width: 40px; height: 40px; }
+  .menu-items { top: 44px; }
+}
+
+/* On a phone the mark sits above the title of a row, so the title keeps the width. */
+@media (max-width: 600px) {
+  .gaprow .req { flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
+}
+
+@media (max-width: 600px) {
+  .btn, .decide .actions .btn { min-height: 40px; }
+}

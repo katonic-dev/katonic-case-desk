@@ -147,18 +147,18 @@ function DueChip({ config, c }) {
   return h("span", { className: `due ${due.tone}` }, h(Icon, { name: "clock" }), due.text);
 }
 
-// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) or a date (2026-11-19, 19 Nov 2026) is kept whole: it is
+// An address (http or https) becomes a link. A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) or a date (2026-11-19, 19 Nov 2026) is kept whole: it is
 // wrapped, not changed, so a copied id is the id. Returns the text itself when
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b/g;
+  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|[A-Z]{2,}(?:-[A-Z0-9]+)+|\d{4}-\d{2}-\d{2}|\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}/g;
   const out = [];
   let last = 0;
   let m;
   while ((m = re.exec(s))) {
     if (m.index > last) out.push(s.slice(last, m.index));
-    out.push(h("span", { key: `${key}-${m.index}`, className: "id" }, m[0]));
+    out.push(/^https?:/.test(m[0]) ? h("a", { key: `${key}-${m.index}`, className: "ext", href: m[0], target: "_blank", rel: "noopener noreferrer" }, m[0]) : h("span", { key: `${key}-${m.index}`, className: "id" }, m[0]));
     last = m.index + m[0].length;
   }
   if (!out.length) return s;
@@ -587,6 +587,8 @@ function CaseView({ config, me, c, refresh }) {
   const fourEyesBlocked = config.rules.fourEyes && c.requested_by.source !== "system" && c.requested_by.email === me.email;
   const rows = latest && !editing ? c.gap_rows || null : null;
   const sections = Array.isArray(c.sections) ? c.sections : [];
+  // A kind of work may word its marks and the lines of a row in its own way (routing.kinds.<kind>.markLabels and the like).
+  const vcfg = c.look ? { ...config, draft: { ...config.draft, marks: c.look.marks, markHints: c.look.markHints, markTones: c.look.markTones, rowLabels: c.look.rowLabels } } : config;
   // A kind of work may offer only some of the decisions (routing.kinds.<kind>.decisions).
   const decisions = Array.isArray(c.decisions_allowed) ? config.decisions.filter((d) => c.decisions_allowed.includes(d.id)) : config.decisions;
 
@@ -679,6 +681,7 @@ function CaseView({ config, me, c, refresh }) {
   const kc = config.case || {};
   // A desk with routing shows the kind its agent was picked by, with the other details.
   const rf = config.routing && config.routing.field;
+  // The kind is not shown a second time when it already sits in the chips beside the status.
   const detailKeys = (kc.detailFields || []).concat(rf && !metaFields(config).includes(rf) && !(kc.detailFields || []).includes(rf) && !(kc.chipFields || []).includes(rf) ? [rf] : []);
   const facts = (keys) => withIds(keys.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · "), "facts");
   const arrivedText = `${viaLabel(config, c.arrived_via) ? `from ${viaLabel(config, c.arrived_via)}` : `via ${c.arrived_via}`}${c.arrived_via === "officer" ? `, ${viaLabel(config, "officer") ? "entered" : "dropped in"} by ${c.requested_by.email}` : ""}, ${fmt(c.created_at)}`;
@@ -869,7 +872,7 @@ function CaseView({ config, me, c, refresh }) {
           ? h(
               "div",
               { className: "headline" },
-              rows && !config.draft.proposalFirst ? h(Tally, { config, rows, only: c.marks_allowed }) : null,
+              rows && !config.draft.proposalFirst ? h(Tally, { config: vcfg, rows, only: c.marks_allowed }) : null,
               c.next_step
                 ? [
                     h("span", { key: "ns" }, h("b", null, "Next step by the desk's rules: "), `${c.next_step.label}, because ${c.next_step.why}.`),
@@ -933,7 +936,7 @@ function CaseView({ config, me, c, refresh }) {
             ]
           : h("textarea", { key: "edit", className: "draft", value: draft, onChange: (e) => setDraft(e.target.value) })
         : rows
-          ? h(GapRows, { key: "rows", config, rows })
+          ? h(GapRows, { key: "rows", config: vcfg, rows })
           : c.checklist
             ? h("div", { key: "gate", className: "card" }, h("p", { className: "summary" }, c.gate_note || "The review stopped before the criteria were checked."))
             : h("div", { key: "prose", className: "draft" }, sections.length ? window.DeskShared.stripSections(latest.text, config) : latest.text)
