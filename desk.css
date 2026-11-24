@@ -484,8 +484,6 @@ table.register td.c-note { white-space: pre-line; }
   .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
-  .tabs button, .filters button, .themeswitch button { min-height: 40px; }
-  .btn, .decide .actions .btn, .btn.tiny { min-height: 40px; }
   .tabs button { padding: 0 6px; }
   .themeswitch button { padding: 2px 12px; }
 }
@@ -618,7 +616,7 @@ textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; 
 }
 /* Tap targets of 40 px on a phone: every control, the fold-out headings and the link-like buttons. */
 @media (max-width: 600px) {
-  .tabs button, .filters button, .themeswitch button, .jump .btn, .menu summary, .menu-items .btn, .btn, .btn.tiny { min-height: 40px; }
+  .tabs button, .filters button, .themeswitch button, .menu summary, .menu-items .btn, .btn, .btn.tiny { min-height: 40px; }
   .decide .actions .btn { min-height: 44px; }
   .menu summary { width: 40px; height: 40px; }
   .menu-items { top: 44px; }
@@ -675,13 +673,4 @@ table.register td.c-customer, table.register td.c-entry, table.register th.c-cus
   .gap:has(.cline) .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .gap:has(.cline) .gaprow .kv .k { padding-top: 8px; }
   .gaprow .cline .clabel { flex-basis: 64px; }
-}
-@media (max-width: 600px) {
-  .btn, .btn.tiny { min-height: 40px; }
-  .menu summary { width: 40px; height: 40px; }
-  .menu-items { top: 44px; }
-  .linklike { display: inline-block; padding: 10px 0; text-align: left; }
-}
-@media (max-width: 600px) {
-  .decide .actions .btn { min-height: 44px; }
 }
