@@ -799,3 +799,8 @@ table.register .addr { display: block; font-size: 12px; color: var(--t4); overfl
   table.register td.c-note, table.register td.c-title, table.register td.c-customer, table.register td.c-entry { min-width: 0; }
 }
 table.register .cv { min-width: 0; overflow-wrap: anywhere; }
+/* Boxes that stay side by side on a phone are narrow: a label sits above its value there. */
+@media (max-width: 600px) {
+  .gaprow .pair:not(.stack) .cline { flex-direction: column; gap: 0; }
+  .gaprow .pair:not(.stack) .cline .clabel { flex: none; }
+}
