@@ -724,12 +724,12 @@ span.mark.has-icon::before { content: none; }
 .gaprow .cline .clabel { min-width: 0; overflow-wrap: anywhere; }
 .gaprow .kv .k { overflow-wrap: anywhere; }
 
-/* On a phone every row's lines put the label above the value, and a label column fits twelve letters. */
+/* On a phone every row's lines put the label above the value, so a long label or a long id never narrows the value. */
 @media (max-width: 600px) {
   .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .gaprow .kvs .kv .k { padding-top: 8px; }
-  .gaprow .cline .clabel { flex-basis: 12ch; }
-  .gaprow .pair .cline .clabel { flex-basis: 12ch; }
+  .gaprow .cline { flex-direction: column; gap: 0; }
+  .gaprow .cline .clabel, .gaprow .pair .cline .clabel { flex: none; }
 }
 
 /* A desk's quiet marks (draft.quietMarks) draw the thin edge, not the stripe. */
