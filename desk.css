@@ -809,3 +809,10 @@ table.register .cv { min-width: 0; overflow-wrap: anywhere; }
 }
 /* An id in the queue line stays whole, also when it starts the line. */
 .caselist .s span.id, .caselist .s span.id:first-child { white-space: nowrap; overflow-wrap: normal; max-width: none; }
+/* Plain lines in a cell (one payment to a line) are set apart a little. */
+.gaprow .cline.plain + .cline.plain { margin-top: 5px; }
+/* The sign-in address under a name in the register stays whole on a wide screen. */
+table.register .addr { white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 600px) {
+  table.register .addr { white-space: normal; overflow-wrap: anywhere; }
+}
