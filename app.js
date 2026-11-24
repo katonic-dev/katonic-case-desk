@@ -231,7 +231,7 @@ function ProposalLead({ text, past }) {
   const at = t.search(/\.(\s|$)/);
   const lead = at > 0 ? t.slice(0, at + 1) : t;
   const rest = at > 0 ? t.slice(at + 1).trim() : "";
-  return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: "pword" }, lead.charAt(0).toUpperCase() + lead.slice(1)), rest ? h("span", { className: "preason" }, rest) : null);
+  return h("span", { className: `proposal-lead${past ? " past" : ""}` }, h("span", { className: "plabel" }, past ? "The agent proposed" : "The agent proposes"), h("span", { className: "pword" }, withIds(lead.charAt(0).toUpperCase() + lead.slice(1), "pw")), rest ? h("span", { className: "preason" }, withIds(rest, "pn")) : null);
 }
 
 function Tally({ config, rows, only }) {
@@ -853,14 +853,14 @@ function CaseView({ config, me, c, refresh }) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: "notice plain" }, "Sent back by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}: ${c.decision.note}`),
+      h("div", { className: "notice plain" }, "Sent back by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}: `, withIds(c.decision.note, "sb")),
       h("p", { className: "small" }, "The agent gets the note and the draft it is replacing. Nothing can be decided until the new draft is in."),
     );
   } else if (c.decision) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, h("b", { className: "declabel" }, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? h("div", { className: "decnote" }, `Note: ${c.decision.note}`) : null),
+      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, h("b", { className: "declabel" }, (config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]), " by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? h("div", { className: "decnote" }, "Note: ", withIds(c.decision.note, "dn")) : null),
       (config.next || {})[c.decision.outcome] ? h("p", { className: "small" }, config.next[c.decision.outcome]) : null,
     );
   } else {
@@ -896,7 +896,7 @@ function CaseView({ config, me, c, refresh }) {
                 : c.proposal
                   ? config.draft.proposalFirst
                     ? h(ProposalLead, { text: c.proposal, past: closed })
-                    : h("span", null, h("b", null, "The agent proposes: "), c.proposal)
+                    : h("span", null, h("b", null, "The agent proposes: "), withIds(c.proposal, "pr"))
                   : config.draft.proposalPrefix
                     ? h("span", { className: "small" }, "The agent proposed no next step.")
                     : null,
