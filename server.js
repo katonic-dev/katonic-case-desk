@@ -23,7 +23,8 @@ function loadConfig(env) {
   const file = path.resolve(__dirname, (env && env.DESK_CONFIG) || "desk.config.json");
   const config = JSON.parse(fs.readFileSync(file, "utf8"));
   Object.defineProperty(config, "__dir", { value: path.dirname(file), enumerable: false });
-  return config;
+  // A decision the agent carries out gets its defaults, and its statuses their labels.
+  return cases.withActs(config);
 }
 
 const DEFAULT_CONFIG = loadConfig({});
@@ -31,6 +32,7 @@ const DEFAULT_CONFIG = loadConfig({});
 const FILES = {
   "/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
   "/desk.css": { file: "desk.css", type: "text/css; charset=utf-8" },
+  "/shared.js": { file: "lib/page-shared.js", type: "text/javascript; charset=utf-8" },
   "/vendor/react.js": { file: "node_modules/react/umd/react.production.min.js", type: "text/javascript; charset=utf-8" },
   "/vendor/react-dom.js": { file: "node_modules/react-dom/umd/react-dom.production.min.js", type: "text/javascript; charset=utf-8" },
 };
@@ -50,6 +52,7 @@ function page(base, name) {
   <script>window.APP_BASE = ${JSON.stringify(base)};</script>
   <script src="${base}/vendor/react.js"></script>
   <script src="${base}/vendor/react-dom.js"></script>
+  <script src="${base}/shared.js"></script>
   <script src="${base}/app.js"></script>
 </body>
 </html>
@@ -110,6 +113,7 @@ async function createDesk(env = process.env) {
   const agent = createAgentClient(env);
   const base = String(env.PUBLIC_URL || "").replace(/\/+$/, "");
   const drafting = new Map(); // case id -> promise, so a draft is not started twice
+  const acting = new Map(); // case id -> promise, so a confirmed decision is not sent to the agent twice
 
   function who(req) {
     return readIdentity(req.headers, env);
@@ -143,9 +147,24 @@ async function createDesk(env = process.env) {
   // one and the text when there is not.
   function caseOut(c) {
     const latest = c.drafts.length ? c.drafts[c.drafts.length - 1] : null;
+    const rules = cases.kindRules(CONFIG, c);
+    const look = cases.lookConfig(CONFIG, c);
+    const gaps = latest ? cases.proposalGaps(latest.text, look) : [];
     return {
       ...c,
-      gap_rows: latest ? cases.parseGapTable(latest.text, CONFIG) : null,
+      // What this kind of work shows: null means every decision, every mark.
+      kind: rules.kind,
+      decisions_allowed: rules.decisions,
+      marks_allowed: rules.marks,
+      sections: latest ? cases.parseSections(latest.text, CONFIG) : [],
+      // How this kind of work words its marks and the lines of a row (null: as the desk does).
+      look: look === CONFIG ? null : { marks: look.draft.marks, markHints: look.draft.markHints, markTones: look.draft.markTones, rowLabels: look.draft.rowLabels },
+      gap_rows: latest ? cases.parseGapTable(latest.text, look, { headings: true }) : null,
+      // The rows the agent's proposal does not name (draft.proposalNames), and the notice that says so.
+      proposal_gaps: gaps,
+      proposal_notice: gaps.length ? cases.proposalNotice(gaps) : "",
+      // A chip for a case that needs to be seen first (case.flags).
+      flag: cases.flagOf(CONFIG, c, latest ? latest.text : ""),
       summary: latest ? cases.summaryOf(latest.text, CONFIG).split("**").join("") : "",
       proposal: latest ? cases.proposalOf(latest.text, CONFIG) : "",
       checklist: latest ? cases.parseChecklist(latest.text, CONFIG) : null,
@@ -155,15 +174,25 @@ async function createDesk(env = process.env) {
     };
   }
 
+  // The agent behind a case: the desk's own, or, on a desk with routing, the
+  // one whose id sits in the environment variable the case's kind names.
+  function agentFor(c) {
+    const route = cases.routeOf(CONFIG, c);
+    if (!route.agentEnv) return { id: agent.agentId, route };
+    const id = env[route.agentEnv] || "";
+    if (!id) throw new Error(`no agent is set for "${route.kind}": set ${route.agentEnv}`);
+    return { id, route };
+  }
   async function runDraft(c, by) {
     const statusBefore = c.status;
     c.status = "drafting";
-    c.events.push({ at: new Date().toISOString(), who: by, what: "draft requested from the agent" });
+    c.events.push({ at: new Date().toISOString(), who: by, what: "asked the agent for a draft" });
     await store.putCase(c);
     const p = (async () => {
       try {
         // Where the library cannot be attached to the agent, the desk searches
         // it with its own key and hands the passages over.
+        const { id: agentId, route } = agentFor(c);
         let passages = null;
         const libraryId = env.KATONIC_LIBRARY_SOURCE_ID || "";
         if (libraryId) {
@@ -180,7 +209,7 @@ async function createDesk(env = process.env) {
           passages = cases.localPassages(CONFIG, c, docs, env.KATONIC_LIBRARY_NAME, 1);
         }
         const reply = await chatOnceMore(
-          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000 }), sessionId: c.agent_session_id || undefined },
+          { message: cases.draftPrompt(CONFIG, c, passages, { searched: Array.isArray(passages), sessionKnown: Boolean(c.agent_session_id), maxChars: Number(env.KATONIC_MAX_MESSAGE_CHARS) || 15000, instruction: route.instruction }), sessionId: c.agent_session_id || undefined, id: agentId },
           async (err) => {
             const now = await store.getCase(c.id);
             now.events.push({ at: new Date().toISOString(), who: "desk", what: `the agent did not answer (${plain(err) === err.message ? err.message.slice(0, 120) : "not reached"}); trying once more` });
@@ -189,7 +218,7 @@ async function createDesk(env = process.env) {
         );
         const fresh = await store.getCase(c.id);
         cases.recordDraft(fresh, reply.content, "agent", reply.sessionId, new Date(), {
-          agent_id: agent.agentId,
+          agent_id: agentId,
           run_id: reply.runId || "",
           library: passages
             ? `${(passages[0] && passages[0].library) || env.KATONIC_LIBRARY_NAME || SHAPE.libraryNoun} (searched by the desk: ${passages.length} passages)`
@@ -197,6 +226,8 @@ async function createDesk(env = process.env) {
           tools: reply.tools || [],
           warning: reply.warning || "",
         });
+        // A proposal that leaves out a row the desk wants named is noted in the case's story (draft.proposalNames).
+        cases.noteProposalGaps(CONFIG, fresh);
         fresh.last_error = "";
         await store.putCase(fresh);
       } catch (err) {
@@ -213,6 +244,67 @@ async function createDesk(env = process.env) {
     })();
     drafting.set(c.id, p);
     return p;
+  }
+
+  // Sends the agent the message that carries a confirmed decision out (step
+  // "act"), the same message again after a failure ("retry"), or the question
+  // about the outcome ("again"), and keeps the answer on the case. Nothing is
+  // sent twice for one click: the case holds the working status and this map
+  // holds the run until the answer is in. The decision itself is already recorded.
+  function runAct(c, step, message, by) {
+    const p = (async () => {
+      try {
+        const which = agentFor(c);
+        const reply = await agent.chat({ message, sessionId: c.agent_session_id || undefined, id: which.id });
+        if (!String(reply.content || "").trim()) throw new Error("the agent sent an empty reply");
+        const fresh = await store.getCase(c.id);
+        const now = new Date();
+        const done = cases.recordAnswer(CONFIG, fresh, reply.content, step, now, { by, run_id: reply.runId || "", tools: reply.tools || [], warning: reply.warning || "" });
+        if (reply.sessionId && !fresh.agent_session_id) fresh.agent_session_id = reply.sessionId;
+        if (fresh.issued_document) fresh.issued_document = cases.issuedDocument(CONFIG, fresh);
+        await store.putCase(fresh);
+        await store.appendRegister(cases.outcomeEntry(CONFIG, fresh, by, done.firstLine, now));
+      } catch (err) {
+        const fresh = await store.getCase(c.id);
+        const now = new Date();
+        const said = plainAct(err);
+        cases.recordActFailure(CONFIG, fresh, step, said, now);
+        if (fresh.issued_document) fresh.issued_document = cases.issuedDocument(CONFIG, fresh);
+        await store.putCase(fresh);
+        await store.appendRegister(cases.outcomeEntry(CONFIG, fresh, by, step === "again" ? `Could not ask again: ${said}` : `${cases.statusLabel(CONFIG, fresh.status)}: ${said}`, now));
+      } finally {
+        acting.delete(c.id);
+      }
+    })();
+    acting.set(c.id, p);
+    p.catch((err) => console.error("could not keep the outcome of", c.id, err.message));
+    return p;
+  }
+  function plainAct(err) {
+    const m = String(err && err.message);
+    if (/fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|ECONNRESET|socket hang up|network|terminated/i.test(m)) return "The agent could not be reached.";
+    // An error from the platform: its status and its own words, not the raw reply.
+    const http = /^the agent did not answer: HTTP (\d+) ?([\s\S]*)$/.exec(m);
+    if (http) {
+      let said = http[2].trim();
+      try {
+        const j = JSON.parse(said);
+        said = String(j.error || j.message || said);
+      } catch (e) {
+        /* not JSON: keep it */
+      }
+      return `The platform answered with an error (HTTP ${http[1]})${said ? `: ${said}` : ""}`.slice(0, 300);
+    }
+    return m.slice(0, 300);
+  }
+  // A case that was being carried out when the desk stopped: the answer never came. It is marked so, and can be tried again.
+  async function settleStale() {
+    for (const c of await store.listCases()) {
+      if (c.status === cases.ACTING && c.outcome && !acting.has(c.id)) {
+        cases.recordActFailure(CONFIG, c, c.outcome.answers.length ? "again" : "act", "the desk stopped before the agent answered, so it is not known what was done. Trying again is safe: the agent reads the current state first", new Date());
+        await store.putCase(c);
+      }
+    }
   }
 
   async function createCase(fields, user, via, autoDraft) {
@@ -298,8 +390,9 @@ async function createDesk(env = process.env) {
       // An officer drops a publication in.
       if (m("POST", /^\/api\/cases$/)) {
         const body = await readBody(req);
-        const { errors, fields } = cases.validateIntake(CONFIG, body);
-        if (errors.length) return json(res, 400, { error: errors.join("; ") });
+        const { errors, fieldErrors, fields } = cases.validateIntake(CONFIG, body);
+        // error: one line of words; errors: one entry for each fault; fields: the short words for each field by its key.
+        if (errors.length) return json(res, 400, { error: errors.join("; "), errors, fields: fieldErrors });
         const c = await createCase(fields, who(req), "officer", body.draft !== false);
         return json(res, 201, caseOut(c));
       }
@@ -323,7 +416,7 @@ async function createDesk(env = process.env) {
         try {
           cases.updateFields(CONFIG, c, body, who(req));
         } catch (err) {
-          return json(res, 409, { error: err.message });
+          return json(res, 409, err.fieldErrors ? { error: err.message, errors: err.errors, fields: err.fieldErrors } : { error: err.message });
         }
         await store.putCase(c);
         return json(res, 200, caseOut(c));
@@ -347,6 +440,7 @@ async function createDesk(env = process.env) {
         if (!c) return json(res, 404, { error: "no such case" });
         if (!agent.configured()) return json(res, 503, { error: `the agent is not configured: set ${agent.missing().join(", ")}` });
         if (SHAPE.closed.includes(c.status)) return json(res, 409, { error: "this case is closed" });
+        if (c.outcome) return json(res, 409, { error: `this ${CONFIG.desk.caseNoun} was confirmed and sent to the agent to carry out; it cannot be drafted again` });
         if (SHAPE.waiting.includes(c.status)) return json(res, 409, { error: `this ${CONFIG.desk.caseNoun} is waiting for a reply; add the reply to draft again` });
         if (drafting.has(c.id)) return json(res, 202, { id: c.id, status: "drafting" });
         runDraft(c, who(req).email);
@@ -375,16 +469,40 @@ async function createDesk(env = process.env) {
         if (!c) return json(res, 404, { error: "no such case" });
         const body = await readBody(req);
         const user = who(req);
+        // One click sends the agent one message: a case that is being carried out takes no second decision.
+        if (acting.has(c.id)) return json(res, 409, { error: `this ${CONFIG.desk.caseNoun} is being carried out` });
         let entry;
         try {
           entry = cases.applyDecision(CONFIG, c, body.decision, user, body.note, body.draft);
         } catch (err) {
           return json(res, 409, { error: err.message });
         }
+        const carrying = c.status === cases.ACTING && c.outcome && c.outcome.state === "working";
+        if (carrying) acting.set(c.id, Promise.resolve());
         if ((CONFIG.audit && CONFIG.audit.outcomes ? CONFIG.audit.outcomes : ["issued"]).includes(entry.decision)) c.issued_document = cases.issuedDocument(CONFIG, c);
         await store.putCase(c);
         await store.appendRegister(entry);
+        if (carrying) runAct(c, "act", c.outcome.message, user.email);
         if (entry.decision === "sent_back" && CONFIG.rules.redraftOnSendBack && agent.configured()) runDraft(c, user.email);
+        return json(res, 200, caseOut(c));
+      }
+
+      // A case that waits for the outcome asks the agent again; a case that was not carried out sends the same request again.
+      if ((p = m("POST", /^\/api\/cases\/([^/]+)\/outcome\/(again|retry)$/))) {
+        const c = await store.getCase(p[0]);
+        if (!c) return json(res, 404, { error: "no such case" });
+        if (!agent.configured()) return json(res, 503, { error: `the agent is not configured: set ${agent.missing().join(", ")}` });
+        if (acting.has(c.id)) return json(res, 202, caseOut(c));
+        const user = who(req);
+        let message;
+        try {
+          message = cases.resumeAct(CONFIG, c, p[1], user);
+        } catch (err) {
+          return json(res, 409, { error: err.message });
+        }
+        acting.set(c.id, Promise.resolve());
+        await store.putCase(c);
+        runAct(c, p[1], message, user.email);
         return json(res, 200, caseOut(c));
       }
 
@@ -392,6 +510,7 @@ async function createDesk(env = process.env) {
         const c = await store.getCase(p[0]);
         if (!c) return json(res, 404, { error: "no such case" });
         if (!agent.configured()) return json(res, 503, { error: `the agent is not configured: set ${agent.missing().join(", ")}` });
+        if (acting.has(c.id)) return json(res, 409, { error: "the agent is carrying this case out. Ask when it has answered." });
         const body = await readBody(req);
         const message = String(body.message || "").trim();
         if (!message) return json(res, 400, { error: "say something" });
@@ -399,7 +518,13 @@ async function createDesk(env = process.env) {
         const at = new Date().toISOString();
         c.conversation.push({ role: "user", by: user.email, content: message, at });
         await store.putCase(c);
-        const reply = await agent.chat({ message: cases.chatPrompt(CONFIG, c, message, Boolean(c.agent_session_id)), sessionId: c.agent_session_id || undefined });
+        let which;
+        try {
+          which = agentFor(c);
+        } catch (err) {
+          return json(res, 503, { error: err.message });
+        }
+        const reply = await agent.chat({ message: cases.chatPrompt(CONFIG, c, message, Boolean(c.agent_session_id)), sessionId: c.agent_session_id || undefined, id: which.id });
         const fresh = await store.getCase(c.id);
         if (reply.sessionId) fresh.agent_session_id = reply.sessionId;
         fresh.conversation.push({ role: "assistant", content: reply.content, at: new Date().toISOString() });
@@ -496,20 +621,30 @@ async function createDesk(env = process.env) {
     }
   }
 
+  await settleStale();
+
   const server = http.createServer(handle);
-  return { server, store, agent, config: CONFIG, drafting, close: async () => { server.close(); await store.close(); } };
+  return { server, store, agent, config: CONFIG, drafting, acting, close: async () => { server.close(); await store.close(); } };
+}
+
+// Reads a settings file into env. The file wins over an ambient key in the
+// shell, key by key, except DESK_AGENT_ID: when that is set in the process
+// environment before the file is read, it stays, so one key file can serve
+// several desks that each name their own agent.
+function loadEnvFile(envFile, env) {
+  if (!fs.existsSync(envFile)) return;
+  const pinned = env.DESK_AGENT_ID;
+  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
+    const mm = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (mm) env[mm[1]] = mm[2].replace(/^"|"$/g, ""); // the desk's .env wins over an ambient key in the shell
+  }
+  if (pinned) env.DESK_AGENT_ID = pinned;
 }
 
 if (require.main === module) {
   // DESK_ENV_FILE names another settings file, so one checkout can run
   // against more than one platform.
-  const envFile = process.env.DESK_ENV_FILE || path.join(__dirname, ".env");
-  if (fs.existsSync(envFile)) {
-    for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
-      const mm = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-      if (mm) process.env[mm[1]] = mm[2].replace(/^"|"$/g, ""); // the desk's .env wins over an ambient key in the shell
-    }
-  }
+  loadEnvFile(process.env.DESK_ENV_FILE || path.join(__dirname, ".env"), process.env);
   const PORT = Number(process.env.PORT || 3000);
   createDesk(process.env).then((desk) => {
     desk.server.listen(PORT, "0.0.0.0", () =>
@@ -518,4 +653,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createDesk, CONFIG: DEFAULT_CONFIG, loadConfig, demoCases };
+module.exports = { createDesk, loadEnvFile, CONFIG: DEFAULT_CONFIG, loadConfig, demoCases };

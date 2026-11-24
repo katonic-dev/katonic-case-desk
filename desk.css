@@ -31,6 +31,8 @@
   --warn-l: #fbf0e3;
   --err: #a3332f;
   --err-l: #fbe9e8;
+  --info: #2b5fa5;
+  --info-l: #e6eefa;
   --fs-sm: 11px;
   --fs-base: 12px;
   --fs-md: 13px;
@@ -92,6 +94,7 @@ h3:first-child { margin-top: 0; }
 .chip.sent_back { background: var(--err-l); color: var(--err); }
 .chip.drafting { background: var(--brand-l); color: var(--brand); }
 .chip.removed, .chip.no_action { background: var(--rule); color: var(--t4); }
+.chip.info_requested { background: var(--warn-l); color: var(--warn); }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
 h2 .chip { margin-left: 8px; font-family: var(--sans); font-weight: 500; position: relative; top: -2px; }
@@ -99,7 +102,7 @@ h2 .chip { margin-left: 8px; font-family: var(--sans); font-weight: 500; positio
 /* Forms and buttons. */
 .form label { display: block; font-size: var(--fs-base); color: var(--t3); margin-top: 8px; }
 .form input, .form textarea, .form select { display: block; width: 100%; margin-top: 3px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--s); font-size: var(--fs-md); color: var(--t); }
-.form input:focus, .form textarea:focus { outline: none; box-shadow: var(--ring); border-color: var(--brand); }
+.form input:focus, .form textarea:focus, .form select:focus { outline: none; box-shadow: var(--ring); border-color: var(--brand); }
 .form textarea { min-height: 72px; resize: vertical; }
 .btn { padding: 6px 12px; border: 1px solid var(--line); background: var(--s); color: var(--t2); cursor: pointer; border-radius: var(--r-md); font-size: var(--fs-md); font-weight: 500; line-height: 1.3; }
 .btn:hover { border-color: var(--t4); }
@@ -136,6 +139,7 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .gaprow.tone-warn { border-left-color: var(--warn); }
 .gaprow.tone-err { border-left-color: var(--err); }
 .gaprow.tone-none { border-left-color: var(--t4); }
+.gaprow.tone-person { border-left-color: var(--brand); }
 .gaprow .n { font-family: var(--mono); font-size: var(--fs-sm); color: var(--t4); padding-top: 3px; }
 .gaprow .req { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .gaprow > div { min-width: 0; }
@@ -154,12 +158,14 @@ textarea.draft:focus { outline: none; box-shadow: var(--ring); border-color: var
 .mark.tone-warn { background: var(--warn-l); color: var(--warn); }
 .mark.tone-err { background: var(--err-l); color: var(--err); }
 .mark.tone-none { background: var(--rule); color: var(--t4); }
+.mark.tone-person { background: var(--brand-l); color: var(--brand); font-weight: 600; }
 
 /* The timeline. */
 .events { font-size: var(--fs-base); color: var(--t2); list-style: none; padding: 0; margin: 0; }
 .events li { padding: 4px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 108px 1fr; gap: 8px; }
 .events time { font-size: var(--fs-sm); color: var(--t4); padding-top: 1px; }
 .events .who { font-weight: 500; color: var(--t2); }
+.events li > span { white-space: pre-line; }
 
 /* The decision and the conversation. */
 .decide { display: flex; flex-direction: column; gap: 8px; }
@@ -324,8 +330,8 @@ h3 .version { font-weight: 400; color: var(--t4); }
 .redo { display: none; }
 
 /* Rows: colour on the edge only where a row needs attention. */
-.gaprow { border-left-width: 1px; padding: 12px 14px 12px 12px; }
-.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.not-found { border-left-width: 4px; }
+.gaprow { border-left-width: 1px; padding: 12px 14px 12px 15px; }
+.gaprow.tone-warn, .gaprow.partly-covered, .gaprow.tone-err, .gaprow.not-covered, .gaprow.tone-none, .gaprow.tone-person, .gaprow.not-found { border-left-width: 4px; padding-left: 12px; }
 .gaprow.tone-ok, .gaprow.covered { border-left-color: var(--line); }
 .gaprow .req .text { font-size: var(--fs-read); }
 .gaprow .src, .gaprow .chk { font-size: var(--fs-sm); }
@@ -400,6 +406,8 @@ details summary { font-size: var(--fs-sm); }
     --warn-l: #33271a;
     --err: #f09690;
     --err-l: #3a201e;
+    --info: #92b7ee;
+    --info-l: #1c2a40;
     --pin: rgba(0, 0, 0, 0.55);
   }
 }
@@ -421,6 +429,8 @@ details summary { font-size: var(--fs-sm); }
   --warn-l: #33271a;
   --err: #f09690;
   --err-l: #3a201e;
+  --info: #92b7ee;
+  --info-l: #1c2a40;
   --pin: rgba(0, 0, 0, 0.55);
 }
 
@@ -461,3 +471,348 @@ details summary { font-size: var(--fs-sm); }
 .chat textarea { min-height: 92px; }
 .doclink { display: inline-flex; vertical-align: -2px; }
 .doclink .icon { margin: 0; }
+
+/* Third-party risk desk design review, 24 Nov 2026 */
+.gaprow .pol .cite.own { display: block; margin: 3px 0 0; font-family: var(--sans); font-size: var(--fs-md); color: var(--t2); overflow-wrap: anywhere; }
+.gaprow .pol .cite.own .lbl { margin-right: 8px; }
+.form label .hint { display: block; font-weight: 400; color: var(--t4); }
+.decide .actions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+table.register td.c-tier, table.register td.c-reference, table.register td.c-received_on, table.register td.c-decided_at, table.register td.c-letter_number { white-space: nowrap; }
+table.register td.c-note { white-space: pre-line; }
+.decision-block .notice { white-space: pre-line; }
+@media (max-width: 1100px) {
+  .columns, .columns.two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .tabs button { padding: 0 6px; }
+  .themeswitch button { padding: 2px 12px; }
+}
+/* A long status ("Waiting for the supplier") goes to its own line instead of cutting the date. */
+.caselist .s { flex-wrap: wrap; }
+.caselist .s span:first-child { flex: none; overflow: visible; }
+
+/* Second round: aligned requirement lines, formatted case text, jump bar, proposal tag, phone header. */
+.gaprow .kvs { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 3px 10px; margin-top: 6px; }
+.gaprow .kv { display: contents; }
+.gaprow .kv .k { font-size: 12px; color: var(--t4); padding-top: 2px; }
+.gaprow .kv .v { font-size: var(--fs-md); color: var(--t2); line-height: 1.45; overflow-wrap: anywhere; }
+.gaprow .kv.src .v { font-size: var(--fs-sm); color: var(--t4); font-family: var(--mono); }
+.gaprow .kv.src .v.long { font-family: var(--sans); font-size: var(--fs-md); color: var(--t2); }
+.gaprow .kv.chk .v { color: var(--t3); }
+.gaprow .kv.chk .k { color: var(--t3); font-weight: 500; }
+.supplied .ct { font-family: var(--serif); font-size: var(--fs-read); line-height: 1.55; color: var(--t); max-width: 68ch; }
+.supplied .ct .bl { height: 6px; }
+.supplied .ct .sec { margin-top: 22px; font-family: var(--sans); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0.06em; color: var(--t3); border-bottom: 1px solid var(--rule); padding-bottom: 3px; }
+.supplied .ct .qn { margin-top: 12px; font-weight: 600; }
+.supplied .ct .ld { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 0 10px; }
+.supplied .ct .lead { font-family: var(--sans); font-size: 12px; color: var(--t4); padding-top: 4px; }
+.btn .proposed { display: block; font-size: 12px; font-weight: 400; color: var(--brand); margin-top: 1px; }
+.btn.primary .proposed { color: var(--on-brand); opacity: 0.9; }
+.jump { display: none; }
+@media (max-width: 1100px) {
+  .jump { display: flex; gap: 8px; position: sticky; top: 0; z-index: 6; background: var(--s); border-bottom: 1px solid var(--line); padding: 6px 16px; }
+  .jump .btn { border-color: var(--line); color: var(--t); min-height: 40px; }
+  #pane-questionnaire, #pane-assessment { scroll-margin-top: 52px; }
+}
+@media (max-width: 600px) {
+  .masthead { height: auto; padding: 8px 16px; flex-wrap: wrap; gap: 4px 16px; }
+  .masthead .spacer { flex: 0 0 100%; height: 0; }
+  .masthead .tabs { align-self: auto; }
+  .tabs button { min-height: 32px; margin-right: 6px; }
+  .gaprow .kvs { grid-template-columns: 96px minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .masthead { gap: 4px 10px; }
+  .themeswitch button { padding: 2px 8px; }
+  .masthead .me { gap: 6px; }
+}
+
+/* ===== Engine round 2, 24 Nov 2026 ===== */
+/* A record id stays whole: it never breaks at its hyphen. */
+.id { white-space: nowrap; }
+/* Figures line up in rows, the register, the tally and the story. */
+.gaprow, .tally, .events, table.register, .due, .caselist .s, .asked, .prose { font-variant-numeric: tabular-nums; }
+.gaprow .n { font-variant-numeric: tabular-nums; }
+.verdict .headline .tally .zero { font-weight: 400; color: var(--t4); }
+.named { white-space: nowrap; }
+
+/* The review header: each item stays whole and the row wraps between them. */
+h3 { flex-wrap: wrap; row-gap: 4px; }
+h3 > * { white-space: nowrap; }
+.btn.tiny { white-space: nowrap; }
+
+/* What was asked of the outside party sits in a block of its own, one item to a line. */
+.notice .lead { margin: 0; }
+.notice .asked { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--t); }
+.notice .asked > div + div { margin-top: 3px; }
+
+/* A long piece of writing: a card of its own, set for reading. */
+.prose-card { margin-top: 14px; padding: 14px 18px 16px; }
+.prose-title { font-size: var(--fs-md); font-weight: 600; color: var(--t); line-height: 1.3; }
+.prose-hint { font-size: var(--fs-sm); color: var(--t4); margin-top: 2px; }
+.prose { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); font-family: var(--serif); font-size: var(--fs-read); line-height: 1.6; color: var(--t); max-width: 66ch; overflow-wrap: break-word; }
+.prose p { margin: 0 0 0.8em; }
+.prose p:last-child { margin-bottom: 0; }
+.editsec { margin-top: 14px; }
+.editsec:first-child { margin-top: 0; }
+.editsec .prose-title { display: block; }
+textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; line-height: 1.6; }
+.editwhole { margin-top: 14px; }
+.editwhole textarea.draft { margin-top: 8px; }
+@media (max-width: 600px) {
+  .prose-card { padding: 12px 14px 14px; }
+  .prose { max-width: none; }
+}
+
+/* On a narrow screen the queue folds to one row while a case is open. */
+.queue > summary { list-style: none; }
+.queue > summary::-webkit-details-marker { display: none; }
+.queue-summary { display: flex; align-items: center; gap: 10px; min-height: 48px; margin: 0; padding: 8px 16px; font-size: var(--fs-md); color: var(--t); background: var(--s); cursor: pointer; }
+.queue-summary::after { content: ""; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--t3); border-bottom: 2px solid var(--t3); transform: rotate(45deg) translateY(-2px); flex: none; }
+.queue[open] > .queue-summary::after { transform: rotate(-135deg) translateY(-2px); }
+.queue[open] > .queue-summary { border-bottom: 1px solid var(--line); }
+.queue-body { padding: 0; }
+.queue-name { font-weight: 600; }
+.queue-count { font-size: var(--fs-sm); padding: 1px 9px; border-radius: 999px; background: var(--rule); color: var(--t2); font-variant-numeric: tabular-nums; }
+.queue-filter { font-size: var(--fs-sm); color: var(--t4); }
+.col.list.queue { padding: 0; }
+.queue-summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; box-shadow: none; }
+
+/* The queue is one tree on every width: its row shows only on a narrow screen with a case open. */
+.queue-summary { display: none; }
+.col.list.queue { padding: 14px 14px 24px; }
+.queue-body { padding: 0; }
+@media (max-width: 1100px) {
+  .col.list.queue { padding: 0; }
+  .queue:not(.solo) > .queue-summary { display: flex; }
+  .queue-body { padding: 14px 16px 24px; }
+  .queue:not([open]) > .queue-body { display: none; }
+}
+
+/* A mark with its own sign (draft.markIcons) does not take the tone's sign. */
+.mark.has-icon::before { content: none; }
+.mark .mi { font-weight: 600; }
+/* draft.sideBySide: the two values of a row stand in two columns, each under its label. */
+.gaprow .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 10px; margin-top: 8px; }
+.gaprow .pair .cell { min-width: 0; padding: 6px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--rule); }
+.gaprow .pair .k { display: block; font-size: 12px; color: var(--t4); margin-bottom: 1px; }
+.gaprow .pair .v { display: block; font-size: var(--fs-md); color: var(--t); line-height: 1.4; overflow-wrap: anywhere; }
+.gaprow .pair .v .none { color: var(--t4); font-style: italic; }
+.gaprow .pair + .kvs { margin-top: 8px; }
+/* draft.proposalFirst: the proposal leads the strip. */
+.verdict .proposal-lead { display: block; }
+.verdict .proposal-lead .plabel { display: block; font-size: var(--fs-sm); color: var(--t4); letter-spacing: 0.02em; }
+.verdict .proposal-lead .pword { display: block; font-family: var(--serif); font-size: 22px; font-weight: 600; line-height: 1.25; color: var(--t); margin: 1px 0 3px; }
+.verdict .proposal-lead .preason { display: block; color: var(--t2); }
+.verdict .headline.tallyline { margin-top: 8px; font-size: var(--fs-sm); }
+.verdict .headline.tallyline .tally { color: var(--t3); font-weight: 500; }
+.gaprow .pair.one { grid-template-columns: minmax(0, 1fr); }
+/* case.foldOnPhone: a fold with a heading on a narrow screen, and no fold at all on a wide one. */
+.fold > summary.foldsum { display: none; }
+@media (max-width: 1100px) {
+  .fold > summary.foldsum { display: flex; align-items: center; min-height: 40px; margin: 8px 0 0; font-weight: 600; font-size: var(--fs-md); color: var(--t); cursor: pointer; border-top: 1px solid var(--rule); }
+  .fold > h3:first-of-type { display: none; }
+  .fold[open] > summary.foldsum { margin-bottom: 4px; }
+}
+/* Tap targets of 40 px on a phone: every control, the fold-out headings and the link-like buttons. */
+@media (max-width: 600px) {
+  .tabs button, .filters button, .themeswitch button, .menu summary, .menu-items .btn, .btn, .btn.tiny { min-height: 40px; }
+  .decide .actions .btn { min-height: 44px; }
+  .menu summary { width: 40px; height: 40px; }
+  .menu-items { top: 44px; }
+  details:not(.queue):not(.menu) > summary { padding: 11px 0; }
+  .linklike { display: inline-block; padding: 10px 0; text-align: left; }
+}
+.decision-block .notice .declabel { font-size: var(--fs-read); font-weight: 600; color: var(--t); }
+.decision-block .notice .decnote { margin-top: 4px; white-space: pre-wrap; }
+/* With the values side by side the ids a row rests on are a quiet last line. */
+.gaprow .pair ~ .kvs .kv.evid .k { color: var(--t4); }
+.gaprow .pair ~ .kvs .kv.evid .v { font-size: var(--fs-sm); color: var(--t4); }
+.fold > summary.foldsum { list-style: none; }
+.fold > summary.foldsum::-webkit-details-marker { display: none; }
+@media (max-width: 1100px) {
+  .fold > summary.foldsum { justify-content: space-between; }
+  .fold > summary.foldsum .foldhint { font-weight: 500; font-size: var(--fs-sm); color: var(--brand); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--s); }
+}
+/* A line in the list that is longer than the column wraps; an id or a date in it stays whole. */
+.caselist .s span:first-child { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+/* Once the officer has decided, the agent's proposal is history: smaller, and the decision is what stands out. */
+.verdict .proposal-lead.past .pword { font-size: var(--fs-read); margin: 0 0 2px; }
+/* The register: ids and notes get room; only a title column is wide by default. */
+.register td:first-child { min-width: 0; }
+.register th.c-title, .register td.c-title { min-width: 220px; }
+table.register td.c-note, table.register th.c-note { min-width: 260px; }
+table.register td.c-customer, table.register td.c-entry, table.register th.c-customer, table.register th.c-entry { min-width: 150px; }
+/* Two more tones for a mark. "info" is for a row about someone else or something
+   apart (a namesake), "plain" for background that bears on nothing. Neither is a
+   pass or a failure, so neither takes a tick or a cross. */
+.gaprow.tone-info { border-left-color: var(--info); border-left-width: 4px; padding-left: 12px; }
+.gaprow.tone-plain { border-left-color: var(--line); }
+.mark.tone-info { background: var(--info-l); color: var(--info); }
+.mark.tone-plain { background: var(--rule); color: var(--t3); }
+.mark.tone-info::before { content: "\2260\00a0"; }
+.mark.tone-plain::before { content: "\2013\00a0"; }
+/* An address in a row is a link the person can follow. */
+.gaprow a.ext { color: var(--brand); overflow-wrap: anywhere; }
+
+/* On a phone the mark sits above the title of a row, so the title keeps the width. */
+@media (max-width: 600px) {
+  .gaprow .req { flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
+}
+
+/* A cell of a row with several lines, each with its own label (Held, Corrected, Source). */
+.gaprow .cline { display: flex; gap: 10px; align-items: baseline; }
+.gaprow .cline + .cline { margin-top: 2px; }
+.gaprow .cline .clabel { flex: 0 0 72px; font-size: var(--fs-sm); color: var(--t4); }
+.gaprow .cline .cval { min-width: 0; }
+.gaprow .cline.l-held .cval { color: var(--t3); }
+.gaprow .cline.l-corrected .cval { color: var(--t); font-weight: 600; }
+
+/* On a phone a row's lines with labels (Held, Corrected, Source) stack and keep their value whole. */
+@media (max-width: 600px) {
+  .gap:has(.cline) .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .gap:has(.cline) .gaprow .kv .k { padding-top: 8px; }
+  .gaprow .cline .clabel { flex-basis: 64px; }
+}
+
+/* A decision the agent carries out: the case's four statuses, and the card with what the bank's systems returned. */
+.chip.act-working { background: var(--brand-l); color: var(--brand); }
+.chip.act-waiting { background: var(--warn-l); color: var(--warn); }
+.chip.act-failed { background: var(--err-l); color: var(--err); }
+.chip.act-done { background: var(--ok-l); color: var(--ok); }
+.outcome-card { margin: 18px 0 0; padding: 14px 18px 16px; border-left: 4px solid var(--line); }
+.outcome-card.state-working { border-left-color: var(--brand); }
+.outcome-card.state-waiting { border-left-color: var(--warn); }
+.outcome-card.state-failed { border-left-color: var(--err); }
+.outcome-card.state-done { border-left-color: var(--ok); }
+.outcome-card .prose-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.outcome-card .notice { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; }
+.outcome-card .notice .dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--brand); animation: pulse 1s ease-in-out infinite; }
+.outcome-card .notice.cause { display: block; }
+.outcome-card .answer { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.outcome-card .answer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: var(--fs-sm); color: var(--t4); }
+.outcome-card .answer-head time { font-weight: 600; color: var(--t2); }
+.outcome-card .answer-head .earlier { margin-left: auto; }
+.outcome-card .answer .prose { margin-top: 6px; padding-top: 0; border-top: 0; max-width: 68ch; }
+.outcome-card .answer .prose ul { margin: 0 0 0.8em; padding-left: 1.25em; }
+.outcome-card .answer .prose li { margin: 0 0 0.4em; }
+.outcome-card .answer.older .prose { color: var(--t3); }
+.outcome-card .outcome-actions { margin-top: 14px; }
+@media (max-width: 600px) {
+  .outcome-card { padding: 12px 14px 14px; }
+  .outcome-card .answer-head .earlier { margin-left: 0; }
+}
+
+/* A long proposal is set at reading size, not display size. */
+.verdict .proposal-lead .pword.long { font-size: 18px; line-height: 1.35; }
+
+/* ===== Engine round 4, 24 Nov 2026 ===== */
+/* A mark with its own sign (draft.markIcons) shows that sign only, whatever its tone. */
+span.mark.has-icon::before { content: none; }
+
+/* Two values side by side (draft.sideBySide). An id stays whole, and breaks inside a narrow box only when it must. */
+.gaprow .pair .id { display: inline-block; max-width: 100%; white-space: normal; word-break: break-all; }
+.gaprow .pair .cline { gap: 8px; }
+.gaprow .pair .cline .clabel { flex-basis: 64px; }
+@media (max-width: 600px) {
+  /* draft.stackOnPhone: the two boxes stand one above the other. */
+  .gaprow .pair.stack { grid-template-columns: minmax(0, 1fr); gap: 8px 0; }
+}
+
+/* Lines in a cell: a label has one width and wraps inside it; a line with no label is a plain line. */
+.gaprow .cline.plain { display: block; }
+.gaprow .cline .clabel { min-width: 0; overflow-wrap: anywhere; }
+.gaprow .kv .k { overflow-wrap: anywhere; }
+
+/* On a phone every row's lines put the label above the value, so a long label or a long id never narrows the value. */
+@media (max-width: 600px) {
+  .gaprow .kvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .gaprow .kvs .kv .k { padding-top: 8px; }
+  .gaprow .cline { flex-direction: column; gap: 0; }
+  .gaprow .cline .clabel, .gaprow .pair .cline .clabel { flex: none; }
+}
+
+/* A desk's quiet marks (draft.quietMarks) draw the thin edge, not the stripe. */
+.gaprow.quiet { border-left-width: 1px; border-left-color: var(--line); padding-left: 15px; }
+
+/* A group heading between rows (draft.groupHeadings). */
+.gaphead { margin: 12px 0 0; padding: 0 2px 3px; font-size: var(--fs-sm); font-weight: 600; color: var(--t3); border-bottom: 1px solid var(--rule); }
+.gaphead:first-child { margin-top: 0; }
+
+/* The count above the rows as a filter (draft.rowFilter). */
+.tallypart { font: inherit; color: inherit; background: none; border: 0; text-decoration: underline dotted var(--t4); text-underline-offset: 3px; padding: 0; margin: 0; cursor: pointer; }
+.tallypart:hover { color: var(--brand); text-decoration-color: var(--brand); }
+.tallypart.on { background: var(--brand-l); color: var(--brand); border-radius: var(--r-xs); padding: 0 5px; text-decoration: none; }
+.rowfilter { margin: 0 0 8px; }
+.sumfold { margin: 0 0 12px; }
+.sumfold > .card { margin-top: 6px; }
+
+/* The link-like button reaches 40 px on a phone. */
+@media (max-width: 600px) {
+  .linklike { display: inline-flex; align-items: center; min-height: 40px; padding: 0; }
+  .tallypart { display: inline-flex; align-items: center; min-height: 40px; }
+}
+
+/* A chip for a case that needs to be seen first (case.flags). */
+.flag { display: inline-flex; align-items: center; font-size: var(--fs-sm); font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: var(--warn-l); color: var(--warn); vertical-align: middle; }
+.flag.f-err { background: var(--err-l); color: var(--err); }
+.flag.f-info { background: var(--info-l); color: var(--info); }
+.flag.f-person { background: var(--brand-l); color: var(--brand); }
+.flag.f-plain { background: var(--rule); color: var(--t3); }
+
+/* The queue line: the facts take the room that is left, and the chips stay together on the first line. */
+.caselist .s { flex-wrap: wrap; align-items: flex-start; }
+.caselist .s > span:first-child { flex: 1 1 11em; min-width: 0; }
+.caselist .s .chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; margin-left: auto; flex: none; max-width: 100%; }
+.caselist .s .chips > span { flex: none; max-width: none; white-space: nowrap; overflow: visible; }
+
+/* Once a person has decided, the decision leads the strip and the agent's proposal is history. */
+.verdict .decidedlead { font-size: var(--fs-md); color: var(--t); margin: 0 0 8px; }
+.verdict .decidedlead b { font-size: var(--fs-read); font-weight: 600; }
+.verdict .decideddiffers { font-size: var(--fs-sm); color: var(--t3); margin: -4px 0 8px; }
+.verdict.decided .headline { color: var(--t3); }
+.verdict-decision.first { margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--rule); }
+.verdict-decision.first .decision-block .notice { margin-top: 0; }
+
+/* A proposal that leaves out a row (draft.proposalNames) is a quiet line above the buttons. */
+.notice.proposal-gap { margin: 0; }
+
+/* The new-case form: a fault sits beside its field, one line for each. */
+.form label.has-error input, .form label.has-error textarea, .form label.has-error select { border-color: var(--err); }
+.field-error { display: block; margin-top: 3px; font-size: var(--fs-sm); font-weight: 500; color: var(--err); }
+.notice.faults > div + div { margin-top: 2px; }
+
+/* The register: a person by name with the address beneath in small type. */
+table.register .who { display: block; }
+table.register .addr { display: block; font-size: 12px; color: var(--t4); overflow-wrap: anywhere; }
+
+/* The register on a phone: one card for each decision, no sideways scroll. */
+@media (max-width: 600px) {
+  table.register, table.register tbody { display: block; overflow: visible; border: 0; background: transparent; }
+  table.register thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.register tr { display: block; margin: 0 0 10px; padding: 8px 12px; background: var(--s); border: 1px solid var(--line); border-radius: var(--r-lg); }
+  table.register td { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 0 10px; min-width: 0; padding: 4px 0; border: 0; white-space: normal; }
+  table.register td::before { content: attr(data-label); color: var(--t4); font-size: var(--fs-sm); }
+  table.register td:empty { display: none; }
+  table.register td:first-child { display: block; font-weight: 600; font-size: var(--fs-md); padding-bottom: 6px; }
+  table.register td:first-child::before { content: none; }
+  table.register td.c-note, table.register td.c-title, table.register td.c-customer, table.register td.c-entry { min-width: 0; }
+}
+table.register .cv { min-width: 0; overflow-wrap: anywhere; }
+/* Boxes that stay side by side on a phone are narrow: a label sits above its value there. */
+@media (max-width: 600px) {
+  .gaprow .pair:not(.stack) .cline { flex-direction: column; gap: 0; }
+  .gaprow .pair:not(.stack) .cline .clabel { flex: none; }
+}
+@media (max-width: 600px) {
+  table.register td:has(> .cv:empty) { display: none; }
+}
+/* An id in the queue line stays whole, also when it starts the line. */
+.caselist .s span.id, .caselist .s span.id:first-child { white-space: nowrap; overflow-wrap: normal; max-width: none; }
+/* Plain lines in a cell (one payment to a line) are set apart a little. */
+.gaprow .cline.plain + .cline.plain { margin-top: 5px; }
+/* The sign-in address under a name in the register stays whole on a wide screen. */
+table.register .addr { white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 600px) {
+  table.register .addr { white-space: normal; overflow-wrap: anywhere; }
+}

@@ -215,3 +215,39 @@ test("the issued document says who wrote each version: a redo is the agent's, an
   assert.ok(doc.includes(`${second.email} edited version 3.`));
   assert.ok(!doc.includes("later versions by the officer"));
 });
+
+test("a desk can name who the issued document says it was issued by, with desk.issuedVerb", () => {
+  const c = dropped();
+  cases.recordDraft(c, "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: covered.", "agent", "s");
+  cases.applyDecision(CONFIG, c, "approve", second, "", null);
+  assert.ok(cases.issuedDocument(CONFIG, c).includes("Issued by b.officer@example.invalid"));
+  const own = { ...CONFIG, desk: { ...CONFIG.desk, issuedVerb: "Recommended for approval by" } };
+  assert.ok(cases.issuedDocument(own, c).includes("Recommended for approval by b.officer@example.invalid"));
+});
+
+test("an intake field with a default takes it when left empty, never over a value", () => {
+  const cfg = { ...CONFIG, intake: { ...CONFIG.intake, fields: CONFIG.intake.fields.map((f) => (f.key === "subject" ? { ...f, default: "AI risk" } : f)) } };
+  const a = cases.validateIntake(cfg, { title: "T", regulator: "R", published_on: "2026-11-01" });
+  assert.equal(a.fields.subject, "AI risk");
+  const b = cases.validateIntake(cfg, { title: "T", regulator: "R", published_on: "2026-11-01", subject: "Other" });
+  assert.equal(b.fields.subject, "Other");
+});
+
+test("the issued document shows the time as the desk does elsewhere, not as a raw timestamp", () => {
+  assert.equal(cases.niceTime("2026-11-24T02:21:07.208Z"), "24 Nov 2026 02:21 UTC");
+  const c = dropped();
+  cases.recordDraft(c, "Draft gap analysis. For review by a compliance officer. Not issued.\nRequirement 1: covered.", "agent", "s");
+  cases.applyDecision(CONFIG, c, "approve", second, "", null, new Date("2026-11-24T02:21:07Z"));
+  const doc = cases.issuedDocument(CONFIG, c);
+  assert.ok(doc.includes("on 24 Nov 2026 02:21 UTC."));
+  assert.ok(!/T02:21:07/.test(doc));
+});
+
+test("the library passage is found by the fields the desk names, not by the title", () => {
+  const cfg = { ...CONFIG, case: { ...CONFIG.case, queryFields: ["subject"] } };
+  const c = dropped();
+  c.fields.title = "Zebra giraffe antelope";
+  c.fields.subject = "Quarterly model inventory attestation";
+  const docs = [{ name: "A", text: "Zebra giraffe antelope savannah" }, { name: "B", text: "Quarterly model inventory attestation procedure" }];
+  assert.equal(cases.localPassages(cfg, c, docs, "L", 1)[0].document, "B");
+});
