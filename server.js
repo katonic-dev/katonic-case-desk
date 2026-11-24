@@ -149,6 +149,7 @@ async function createDesk(env = process.env) {
     const latest = c.drafts.length ? c.drafts[c.drafts.length - 1] : null;
     const rules = cases.kindRules(CONFIG, c);
     const look = cases.lookConfig(CONFIG, c);
+    const gaps = latest ? cases.proposalGaps(latest.text, look) : [];
     return {
       ...c,
       // What this kind of work shows: null means every decision, every mark.
@@ -158,7 +159,12 @@ async function createDesk(env = process.env) {
       sections: latest ? cases.parseSections(latest.text, CONFIG) : [],
       // How this kind of work words its marks and the lines of a row (null: as the desk does).
       look: look === CONFIG ? null : { marks: look.draft.marks, markHints: look.draft.markHints, markTones: look.draft.markTones, rowLabels: look.draft.rowLabels },
-      gap_rows: latest ? cases.parseGapTable(latest.text, look) : null,
+      gap_rows: latest ? cases.parseGapTable(latest.text, look, { headings: true }) : null,
+      // The rows the agent's proposal does not name (draft.proposalNames), and the notice that says so.
+      proposal_gaps: gaps,
+      proposal_notice: gaps.length ? cases.proposalNotice(gaps) : "",
+      // A chip for a case that needs to be seen first (case.flags).
+      flag: cases.flagOf(CONFIG, c, latest ? latest.text : ""),
       summary: latest ? cases.summaryOf(latest.text, CONFIG).split("**").join("") : "",
       proposal: latest ? cases.proposalOf(latest.text, CONFIG) : "",
       checklist: latest ? cases.parseChecklist(latest.text, CONFIG) : null,
@@ -220,6 +226,8 @@ async function createDesk(env = process.env) {
           tools: reply.tools || [],
           warning: reply.warning || "",
         });
+        // A proposal that leaves out a row the desk wants named is noted in the case's story (draft.proposalNames).
+        cases.noteProposalGaps(CONFIG, fresh);
         fresh.last_error = "";
         await store.putCase(fresh);
       } catch (err) {
@@ -382,8 +390,9 @@ async function createDesk(env = process.env) {
       // An officer drops a publication in.
       if (m("POST", /^\/api\/cases$/)) {
         const body = await readBody(req);
-        const { errors, fields } = cases.validateIntake(CONFIG, body);
-        if (errors.length) return json(res, 400, { error: errors.join("; ") });
+        const { errors, fieldErrors, fields } = cases.validateIntake(CONFIG, body);
+        // error: one line of words; errors: one entry for each fault; fields: the short words for each field by its key.
+        if (errors.length) return json(res, 400, { error: errors.join("; "), errors, fields: fieldErrors });
         const c = await createCase(fields, who(req), "officer", body.draft !== false);
         return json(res, 201, caseOut(c));
       }
@@ -407,7 +416,7 @@ async function createDesk(env = process.env) {
         try {
           cases.updateFields(CONFIG, c, body, who(req));
         } catch (err) {
-          return json(res, 409, { error: err.message });
+          return json(res, 409, err.fieldErrors ? { error: err.message, errors: err.errors, fields: err.fieldErrors } : { error: err.message });
         }
         await store.putCase(c);
         return json(res, 200, caseOut(c));
