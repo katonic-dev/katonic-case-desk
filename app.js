@@ -182,9 +182,9 @@ function DueChip({ config, c }) {
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  // Also kept whole: an amount with its currency (USD 25,000.00), and a long code that mixes
+  // Also kept whole: an amount with its currency (USD 25,000.00), with the word credit or debit after it, and a long code that mixes
   // capitals and digits, such as an IBAN or a bank identifier.
-  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b|\b[A-Z]{3} \d(?:[\d,]*\d)?(?:\.\d+)?|\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{8,34}\b/g;
+  const re = /https?:\/\/[^\s<>"')]*[^\s<>"').,;]|\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\b|\b[A-Z]{3} \d(?:[\d,]*\d)?(?:\.\d+)?(?: (?:credit|debit)\b)?|\b\d[\d,]*\.\d\d (?:credit|debit)\b|\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{8,34}\b/g;
   const out = [];
   let last = 0;
   let m;

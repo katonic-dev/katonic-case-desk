@@ -287,3 +287,9 @@ test("the server sends the notice, the chip and the faults by field", async () =
     await desk.close();
   }
 });
+
+test("an amount is kept whole with the word credit or debit after it", () => {
+  const out = sandbox.withIds("Amount USD 12,480.00 credit, and 3,275.40 debit; USD 9.50 is not a credit.", "t");
+  const ids = out.filter((n) => typeof n !== "string").map(textOf);
+  assert.deepEqual(Array.from(ids), ["USD 12,480.00 credit", "3,275.40 debit", "USD 9.50"]);
+});
