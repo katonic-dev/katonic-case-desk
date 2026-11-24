@@ -368,3 +368,30 @@ test("the story of a case names a decision in the past tense where the desk give
   assert.match(b.events[b.events.length - 1].what, /^[a-z]/);
   assert.match(b.events[b.events.length - 1].what, /: Cite clause 4$/);
 });
+
+test("routing.other gives the decisions and marks of a kind the desk does not know", () => {
+  const cfg = { routing: { field: "kind", kinds: { A: { decisions: ["approve"] } }, other: { decisions: ["refer", "send_back"], marks: ["unclear"] } } };
+  const at = (k) => cases.kindRules(cfg, { fields: { kind: k } });
+  assert.deepEqual(at("A").decisions, ["approve"]);
+  assert.deepEqual(at("Z").decisions, ["refer", "send_back"]);
+  assert.deepEqual(at("Z").marks, ["unclear"]);
+  assert.equal(at("").decisions && at("").decisions.join(), "refer,send_back", "no value at all is an unknown kind too");
+  const none = { routing: { field: "kind", kinds: { A: { decisions: ["approve"] } } } };
+  assert.equal(cases.kindRules(none, { fields: { kind: "Z" } }).decisions, null, "without other, an unknown kind shows every decision as before");
+});
+
+test("a letter may write its dates as 24 Nov 2026; by default they stay as 2026-11-24", () => {
+  const who = { email: "r@x.invalid", source: "stand-in" };
+  const mk = () => ({ ...fake("Standard"), fields: { urgency: "Standard", name: "Ann" }, status: "for_review", requested_by: { email: "feed", source: "system" }, conversation: [], events: [], letters: [], drafts: [{ version: 1, text: "x", by: "agent" }] });
+  const letter = (extra) => ({ ...ROUTED, letters: { info_requested: { title: "More", prefix: "ZZ", days: 7, opening: "Hello.", list: "note", listHeading: "Need", dateLine: "By {until}.", body: [], signature: "Desk", ...extra } } });
+  const now = new Date("2026-11-24T10:00:00Z");
+  const cfgOf = (extra) => ({ ...letter(extra), decisions: [...ROUTED.decisions, { id: "ask", label: "Ask", outcome: "info_requested", needsNote: true }], routing: undefined });
+  const a = mk();
+  cases.applyDecision(cfgOf({}), a, "ask", who, "One thing", null, now);
+  assert.match(a.letters[0].text, /Date: 2026-11-24/);
+  assert.match(a.letters[0].text, /By 2026-12-01./);
+  const b = mk();
+  cases.applyDecision(cfgOf({ dateStyle: "long" }), b, "ask", who, "One thing", null, now);
+  assert.match(b.letters[0].text, /Date: 24 Nov 2026/);
+  assert.match(b.letters[0].text, /By 1 Dec 2026./);
+});
