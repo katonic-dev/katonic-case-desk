@@ -92,17 +92,44 @@ function viaLabel(config, via) {
   return ((config.desk && config.desk.arrivedVia) || {})[via] || "";
 }
 
+// Working days are Monday to Friday. No holidays: the desk does not know a bank's calendar.
+function addWorkingDays(from, n) {
+  const d = new Date(from);
+  let left = n;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left--;
+  }
+  return d;
+}
+
+// The working days from one day to another: positive when "to" is later,
+// negative when it is earlier, 0 for the same day. The first day is not counted.
+function workingDaysBetween(from, to) {
+  const sign = to >= from ? 1 : -1;
+  const a = sign === 1 ? new Date(from) : new Date(to);
+  const b = sign === 1 ? new Date(to) : new Date(from);
+  let n = 0;
+  while (a < b) {
+    a.setDate(a.getDate() + 1);
+    if (a.getDay() !== 0 && a.getDay() !== 6) n++;
+  }
+  return n * sign;
+}
+
 // When a case is due, for desks whose config gives a turnaround:
-// config.due = { field, urgencyField, standardDays, expeditedDays }.
-function dueOf(config, c) {
+// config.due = { field, urgencyField, standardDays, expeditedDays, workingDays }.
+// With workingDays: true the days are Monday to Friday; otherwise calendar days.
+function dueOf(config, c, now = new Date()) {
   const d = config.due;
   if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(c.fields[d.field] || "")) return null;
   const expedited = /expedit|urgent/i.test(c.fields[d.urgencyField] || "");
-  const date = new Date(`${c.fields[d.field]}T00:00:00`);
-  date.setDate(date.getDate() + (expedited ? d.expeditedDays : d.standardDays));
-  const today = new Date();
+  let date = new Date(`${c.fields[d.field]}T00:00:00`);
+  if (d.workingDays === true) date = addWorkingDays(date, expedited ? d.expeditedDays : d.standardDays);
+  else date.setDate(date.getDate() + (expedited ? d.expeditedDays : d.standardDays));
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  const days = Math.round((date - today) / 86400000);
+  const days = d.workingDays === true ? workingDaysBetween(today, date) : Math.round((date - today) / 86400000);
   const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return { date, expedited, days, text: days < 0 ? `Overdue since ${day}` : days === 0 ? "Due today" : `Due ${day}`, tone: days < 0 ? "err" : days <= 2 ? "warn" : "" };
 }
@@ -111,6 +138,57 @@ function DueChip({ config, c }) {
   const due = dueOf(config, c);
   if (!due || closedStatuses(config).includes(c.status)) return null;
   return h("span", { className: `due ${due.tone}` }, h(Icon, { name: "clock" }), due.text);
+}
+
+// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) is kept whole: it is
+// wrapped, not changed, so a copied id is the id. Returns the text itself when
+// it holds no id.
+function withIds(text, key = "i") {
+  const s = String(text == null ? "" : text);
+  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b/g;
+  const out = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(s))) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    out.push(h("span", { key: `${key}-${m.index}`, className: "id" }, m[0]));
+    last = m.index + m[0].length;
+  }
+  if (!out.length) return s;
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
+
+// A person by name, with the sign-in address as the element's title. The name
+// is the desk's own where it knows it (the signed-in person, the person who
+// entered the case) and otherwise read from the address, where it can be.
+function nameOf(me, c, email) {
+  return window.DeskShared.displayName(email, [{ email: me.email, name: me.name }].concat(c && c.requested_by ? [{ email: c.requested_by.email, name: c.requested_by.name }] : []));
+}
+
+function Named({ me, c, email }) {
+  const name = nameOf(me, c, email);
+  return h("span", { className: "named", title: name !== email ? email : undefined }, name);
+}
+
+// A long piece of writing: paragraphs split at blank lines, line breaks kept,
+// nothing read as HTML (React writes text as text).
+function Prose({ text }) {
+  const paras = String(text || "").replace(/\r/g, "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  return paras.map((p, i) => h("p", { key: i }, p.split("\n").map((line, j, all) => h(React.Fragment, { key: j }, withIds(line, `${i}-${j}`), j < all.length - 1 ? h("br") : null))));
+}
+
+// One card for each named section the agent wrote (draft.sections).
+function SectionCards({ sections }) {
+  return sections.map((s) =>
+    h(
+      "section",
+      { key: s.heading, className: "card prose-card", "aria-label": s.title },
+      h("div", { className: "prose-title" }, s.title),
+      s.hint ? h("div", { className: "prose-hint" }, s.hint) : null,
+      h("div", { className: "prose" }, h(Prose, { text: s.text })),
+    ),
+  );
 }
 
 // A small set of line icons, drawn here so the desk needs no icon files.
@@ -126,14 +204,20 @@ function Icon({ name }) {
 }
 
 // A count of the marks in a review: "3 met, 1 partly met".
-function tally(config, rows) {
+// A kind of work that names its marks (only) shows each of them, with a zero
+// where none was given; a mark outside the list is still counted when it was given.
+function tally(config, rows, only) {
   const counts = {};
   for (const r of rows) counts[r.mark || "unmarked"] = (counts[r.mark || "unmarked"] || 0) + 1;
-  return Object.keys(config.draft.marks || {})
-    .filter((k) => counts[k])
-    .map((k) => `${counts[k]} ${config.draft.marks[k].toLowerCase()}`)
-    .concat(counts.unmarked ? [`${counts.unmarked} unmarked`] : [])
-    .join(", ");
+  const marks = config.draft.marks || {};
+  const named = Array.isArray(only) ? only.filter((k) => marks[k]) : [];
+  const keys = named.length ? named.concat(Object.keys(marks).filter((k) => !named.includes(k) && counts[k])) : Object.keys(marks).filter((k) => counts[k]);
+  return keys.map((k) => ({ text: `${counts[k] || 0} ${marks[k].toLowerCase()}`, zero: !counts[k] })).concat(counts.unmarked ? [{ text: `${counts.unmarked} unmarked`, zero: false }] : []);
+}
+
+function Tally({ config, rows, only }) {
+  const parts = tally(config, rows, only);
+  return h("span", { className: "tally" }, parts.map((p, i) => h(React.Fragment, { key: i }, i ? ", " : "", h("span", { className: p.zero ? "zero" : undefined }, p.text))));
 }
 
 // The gap analysis as the agent wrote it: one row per requirement when it
@@ -149,7 +233,7 @@ function GapRows({ config, rows }) {
   const rl = config.draft.rowLabels || {};
   // A desk that labels the citation ("Evidence") gets its lines in two aligned columns.
   if (rl.citation) {
-    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, value));
+    const kv = (cls, label, value) => h("div", { className: `kv ${cls}`, key: cls }, h("span", { className: "k" }, label), h("span", { className: cls === "src" && config.draft.plainSource ? "v long" : "v" }, withIds(value, cls)));
     return h(
       "div",
       { className: "gap" },
@@ -161,8 +245,8 @@ function GapRows({ config, rows }) {
           h(
             "div",
             null,
-            h("div", { className: "req" }, h("span", { className: "text" }, r.requirement), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-            h("div", { className: "kvs" }, r.source ? kv("src", rl.source || "", r.source) : null, r.policy ? kv("pol", rl.policy || "", r.policy) : null, r.citation ? kv("evid", rl.citation, r.citation) : null, r.check ? kv("chk", "Check", r.check) : null),
+            h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
+            h("div", { className: "kvs" }, r.source ? kv("src", rl.source || "", r.source) : null, r.policy ? kv("pol", rl.policy || "", r.policy) : null, r.citation ? kv("evid", rl.citation, r.citation) : null, r.check ? kv("chk", rl.check || "Check", r.check) : null),
           ),
         ),
       ),
@@ -179,10 +263,10 @@ function GapRows({ config, rows }) {
         h(
           "div",
           null,
-          h("div", { className: "req" }, h("span", { className: "text" }, r.requirement), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
-          r.source ? h("div", { className: "src" }, rowLabel(config, "source"), r.source) : null,
-          h("div", { className: "pol" }, rowLabel(config, "policy"), r.policy, r.citation ? h("span", { className: rowLabel(config, "citation") ? "cite own" : "cite" }, rowLabel(config, "citation"), r.citation) : null),
-          r.check ? h("div", { className: "chk" }, h("b", null, "Check: "), r.check) : null,
+          h("div", { className: "req" }, h("span", { className: "text" }, withIds(r.requirement, "q")), h(Mark, { config, mark: r.mark, text: r.markText, tone: r.tone })),
+          r.source ? h("div", { className: "src" }, rowLabel(config, "source"), withIds(r.source, "s")) : null,
+          h("div", { className: "pol" }, rowLabel(config, "policy"), withIds(r.policy, "p"), r.citation ? h("span", { className: rowLabel(config, "citation") ? "cite own" : "cite" }, rowLabel(config, "citation"), withIds(r.citation, "c")) : null),
+          r.check ? h("div", { className: "chk" }, h("b", null, `${rl.check || "Check"}: `), withIds(r.check, "k")) : null,
         ),
       ),
     ),
@@ -381,7 +465,7 @@ function CaseText({ text }) {
   const NUM = /^\d+(\.\d+)+\s/;
   const LEAD = /^([A-Z][A-Za-z' ]{1,18}):\s+(.*)$/;
   const lines = String(text || "").replace(/\r/g, "").split("\n");
-  if (!lines.some((l) => CAPS.test(l.trim()) || NUM.test(l.trim()) || LEAD.test(l.trim()))) return h("p", null, text);
+  if (!lines.some((l) => CAPS.test(l.trim()) || NUM.test(l.trim()) || LEAD.test(l.trim()))) return h("p", null, withIds(text, "t"));
   return h(
     "div",
     { className: "ct" },
@@ -389,10 +473,10 @@ function CaseText({ text }) {
       const t = l.trim();
       if (!t) return h("div", { key: i, className: "bl" });
       if (CAPS.test(t)) return h("div", { key: i, className: "sec" }, t);
-      if (NUM.test(t)) return h("div", { key: i, className: "qn" }, t);
+      if (NUM.test(t)) return h("div", { key: i, className: "qn" }, withIds(t, i));
       const m = LEAD.exec(t);
-      if (m) return h("div", { key: i, className: "ld" }, h("span", { className: "lead" }, m[1]), h("span", null, m[2]));
-      return h("div", { key: i }, t);
+      if (m) return h("div", { key: i, className: "ld" }, h("span", { className: "lead" }, m[1]), h("span", null, withIds(m[2], i)));
+      return h("div", { key: i }, withIds(t, i));
     }),
   );
 }
@@ -435,8 +519,10 @@ function CaseView({ config, me, c, refresh }) {
   const [removing, setRemoving] = React.useState(false);
   const [reply, setReply] = React.useState("");
   const [chatErr, setChatErr] = React.useState("");
+  const [typed, setTyped] = React.useState({}); // a section's text as typed, so its box keeps what is being typed
   React.useEffect(() => {
     setDraft(latest ? latest.text : "");
+    setTyped({});
     setEditing(false);
     setNote("");
     setChoice("");
@@ -453,6 +539,9 @@ function CaseView({ config, me, c, refresh }) {
   const edited = latest && draft !== latest.text;
   const fourEyesBlocked = config.rules.fourEyes && c.requested_by.source !== "system" && c.requested_by.email === me.email;
   const rows = latest && !editing ? c.gap_rows || null : null;
+  const sections = Array.isArray(c.sections) ? c.sections : [];
+  // A kind of work may offer only some of the decisions (routing.kinds.<kind>.decisions).
+  const decisions = Array.isArray(c.decisions_allowed) ? config.decisions.filter((d) => c.decisions_allowed.includes(d.id)) : config.decisions;
 
   async function decide(d) {
     setBusy(d.id);
@@ -625,21 +714,22 @@ function CaseView({ config, me, c, refresh }) {
     c.status === "drafting" ? h("div", { key: "n1", className: "notice plain" }, "The agent is drafting. This page refreshes on its own.") : null,
     c.last_error ? h("div", { key: "n2", className: "notice bad" }, `The last run failed: ${c.last_error}`) : null,
     latest && latest.warning ? h("div", { key: "n3", className: "notice" }, latest.warning, " The draft below is complete as received; check it as you would any draft.") : null,
-    c.status === "removed" ? h("div", { key: "n4", className: "notice plain" }, `Removed by ${c.removed.by} at ${fmt(c.removed.at)}: ${c.removed.note}`) : null,
+    c.status === "removed" ? h("div", { key: "n4", className: "notice plain" }, "Removed by ", h(Named, { me, c, email: c.removed.by }), ` at ${fmt(c.removed.at)}: ${c.removed.note}`) : null,
   ];
 
   // The decision.
+  const askedLines = waiting && c.decision ? String(c.decision.note || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
   let decisionPanel;
   if (open) {
-    const chosen = config.decisions.find((d) => d.id === choice) || null;
+    const chosen = decisions.find((d) => d.id === choice) || null;
     // The desk's approving decision is the one called "approve" or, failing that, the one whose outcome is "issued".
-    const approve = config.decisions.find((d) => d.id === "approve") || config.decisions.find((d) => d.outcome === "issued");
-    const redo = config.decisions.filter((d) => d.outcome === "sent_back");
-    const others = config.decisions.filter((d) => d !== approve && d.outcome !== "sent_back");
+    const approve = decisions.find((d) => d.id === "approve") || decisions.find((d) => d.outcome === "issued");
+    const redo = decisions.filter((d) => d.outcome === "sent_back");
+    const others = decisions.filter((d) => d !== approve && d.outcome !== "sent_back");
     // Where the desk has a pass mark, Approve is the filled button only when
     // every row carries it; otherwise approving takes a reason.
     // When the agent proposes another decision, Approve is not the filled one.
-    const proposedId = proposedDecision(config, c.proposal);
+    const proposedId = proposedDecision({ ...config, decisions }, c.proposal);
     const leanApprove = leansApprove(c.all_pass, proposedId, approve);
     const approveNeedsReason = Boolean(config.rules.reasonToApproveUnmet && c.all_pass === false);
     const tag = (d) => (proposedId === d.id ? h("span", { className: "proposed" }, "Agent's proposal") : null);
@@ -681,7 +771,13 @@ function CaseView({ config, me, c, refresh }) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: "notice plain" }, `${config.statuses[c.status]} since ${fmt(c.decision.at)}. ${c.decision.by} asked: ${c.decision.note}`),
+      h(
+        "div",
+        { className: "notice plain" },
+        h("p", { className: "lead" }, `${config.statuses[c.status]} since ${fmt(c.decision.at)}. `, h(Named, { me, c, email: c.decision.by }), askedLines.length ? " asked:" : "."),
+        // What was asked, in a block of its own, one item to a line.
+        askedLines.length ? h("div", { className: "asked" }, askedLines.map((l, i) => h("div", { key: i }, withIds(l, i)))) : null,
+      ),
       (config.next || {})[c.status] ? h("p", { className: "small" }, config.next[c.status]) : null,
       h(
         "form",
@@ -694,14 +790,14 @@ function CaseView({ config, me, c, refresh }) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: "notice plain" }, `Sent back by ${c.decision.by} at ${fmt(c.decision.at)}: ${c.decision.note}`),
+      h("div", { className: "notice plain" }, "Sent back by ", h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}: ${c.decision.note}`),
       h("p", { className: "small" }, "The agent gets the note and the draft it is replacing. Nothing can be decided until the new draft is in."),
     );
   } else if (c.decision) {
     decisionPanel = h(
       "div",
       null,
-      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, `${(config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]} by ${c.decision.by} at ${fmt(c.decision.at)}.`, c.decision.note ? ` Note: ${c.decision.note}` : ""),
+      h("div", { className: `notice ${c.decision.outcome === "issued" ? "ok" : "plain"}` }, `${(config.decisionLabels || {})[c.decision.outcome] || config.statuses[c.decision.outcome]} by `, h(Named, { me, c, email: c.decision.by }), ` at ${fmt(c.decision.at)}.`, c.decision.note ? ` Note: ${c.decision.note}` : ""),
       (config.next || {})[c.decision.outcome] ? h("p", { className: "small" }, config.next[c.decision.outcome]) : null,
     );
   } else {
@@ -726,7 +822,7 @@ function CaseView({ config, me, c, refresh }) {
           ? h(
               "div",
               { className: "headline" },
-              rows ? h("span", { className: "tally" }, tally(config, rows)) : null,
+              rows ? h(Tally, { config, rows, only: c.marks_allowed }) : null,
               c.next_step
                 ? [
                     h("span", { key: "ns" }, h("b", null, "Next step by the desk's rules: "), `${c.next_step.label}, because ${c.next_step.why}.`),
@@ -760,15 +856,41 @@ function CaseView({ config, me, c, refresh }) {
     latest && c.summary && !rows ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, c.summary)) : null,
     latest
       ? editing && open
-        ? h("textarea", { key: "edit", className: "draft", value: draft, onChange: (e) => setDraft(e.target.value) })
+        ? sections.length
+          ? [
+              // Each named section in a box of its own; the whole text, with the table, is one step further.
+              ...sections.map((s, i) => {
+                const now = window.DeskShared.parseSections(draft, config).find((x) => x.heading === s.heading);
+                const id = `sec-edit-${i}`;
+                return h(
+                  "div",
+                  { key: `edit-${s.heading}`, className: "editsec" },
+                  h("label", { htmlFor: id, className: "prose-title" }, s.title),
+                  s.hint ? h("div", { className: "prose-hint" }, s.hint) : null,
+                  h("textarea", {
+                    id,
+                    className: "draft prose-edit",
+                    value: typed[s.heading] != null ? typed[s.heading] : now ? now.text : "",
+                    onChange: (e) => {
+                      setTyped({ ...typed, [s.heading]: e.target.value });
+                      setDraft(window.DeskShared.replaceSection(draft, config, s.heading, e.target.value));
+                    },
+                  }),
+                );
+              }),
+              h("details", { key: "edit-whole", className: "editwhole" }, h("summary", null, `The whole text, with the table and the last line`), h("textarea", { className: "draft", "aria-label": "The whole text", value: draft, onChange: (e) => { setTyped({}); setDraft(e.target.value); } })),
+            ]
+          : h("textarea", { key: "edit", className: "draft", value: draft, onChange: (e) => setDraft(e.target.value) })
         : rows
           ? h(GapRows, { key: "rows", config, rows })
           : c.checklist
             ? h("div", { key: "gate", className: "card" }, h("p", { className: "summary" }, c.gate_note || "The review stopped before the criteria were checked."))
-            : h("div", { key: "prose", className: "draft" }, latest.text)
+            : h("div", { key: "prose", className: "draft" }, sections.length ? window.DeskShared.stripSections(latest.text, config) : latest.text)
       : twoPane && c.status !== "drafting" ? null : h("div", { key: "none", className: "empty" }, c.status === "drafting" ? "Waiting for the agent..." : "No draft yet."),
+    // The agent's long pieces of writing, each on a card of its own below the rows.
+    latest && !editing && sections.length ? h(SectionCards, { key: "sections", sections }) : null,
     latest && open
-      ? h("p", { key: "ver", className: "small" }, edited ? "You have edited the draft. Your version is recorded when you decide." : `Version ${latest.version} was written by ${latest.by === "agent" ? "the agent" : latest.by} at ${fmt(latest.at)}${latest.library ? `, against ${latest.library}` : ""}. Edit it if you need to; the register keeps every version.`)
+      ? h("p", { key: "ver", className: "small" }, edited ? "You have edited the draft. Your version is recorded when you decide." : ["Version ", latest.version, " was written by ", latest.by === "agent" ? "the agent" : h(Named, { key: "by", me, c, email: latest.by }), ` at ${fmt(latest.at)}${latest.library ? `, against ${latest.library}` : ""}. Edit it if you need to; the register keeps every version.`])
       : null,
     c.issued_document || (c.letters || []).length
       ? h(
@@ -795,7 +917,7 @@ function CaseView({ config, me, c, refresh }) {
       const arrived = /^arrived via (\w+)$/.exec(e.what);
       const from = arrived && viaLabel(config, arrived[1]);
       const plainVia = arrived && e.who === arrived[1] ? { feed: "Arrived from the feed", sweep: "Found by a sweep" }[arrived[1]] : "";
-      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : plainVia ? h("span", null, plainVia) : h("span", null, h("span", { className: "who" }, e.who), " ", e.what));
+      return h("li", { key: i }, h("time", null, fmt(e.at)), from ? h("span", null, `Arrived from ${from}`) : plainVia ? h("span", null, plainVia) : h("span", null, h("span", { className: "who" }, h(Named, { me, c, email: e.who })), " ", e.what));
     })),
   ];
 
@@ -806,7 +928,7 @@ function CaseView({ config, me, c, refresh }) {
         h(
           "div",
           { key: "c", className: "chat" },
-          c.conversation.map((m, i) => h("div", { key: i, className: `msg ${m.role}` }, h("span", { className: "by" }, m.role === "user" ? m.by : "the agent", " · ", fmt(m.at)), m.role === "user" ? m.content : h(Rich, { text: m.content }))),
+          c.conversation.map((m, i) => h("div", { key: i, className: `msg ${m.role}` }, h("span", { className: "by" }, m.role === "user" ? h(Named, { me, c, email: m.by }) : "the agent", " · ", fmt(m.at)), m.role === "user" ? m.content : h(Rich, { text: m.content }))),
           h(
             "form",
             { onSubmit: ask, className: "form" },
@@ -897,7 +1019,25 @@ function ThemeSwitch() {
   );
 }
 
+// True while the screen is narrow enough that the queue sits above the case.
+function useNarrow() {
+  const query = "(max-width: 1100px)";
+  const [narrow, setNarrow] = React.useState(() => typeof window.matchMedia === "function" && window.matchMedia(query).matches);
+  React.useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const m = window.matchMedia(query);
+    const on = () => setNarrow(m.matches);
+    on();
+    if (m.addEventListener) m.addEventListener("change", on);
+    else m.addListener(on);
+    return () => (m.removeEventListener ? m.removeEventListener("change", on) : m.removeListener(on));
+  }, []);
+  return narrow;
+}
+
 function App() {
+  const narrow = useNarrow();
+  const [queueOpen, setQueueOpen] = React.useState(false); // the queue on a narrow screen, while a case is open
   const [config, setConfig] = React.useState(null);
   const [me, setMe] = React.useState(null);
   const [health, setHealth] = React.useState(null);
@@ -953,6 +1093,26 @@ function App() {
   const shown = pool.filter((c) => !q || Object.values(c.fields).join(" ").slice(0, 2000).toLowerCase().includes(q)).sort(byDue);
   const listFields = (config.case && config.case.listFields) || metaFields(config);
   const counts = Object.fromEntries(filters.map((f) => [f.id, list.filter(f.test).length]));
+  // Picking a case opens it. On a narrow screen the queue then folds away, and the page starts at the case.
+  const pick = (id) => {
+    setSelected(id);
+    if (narrow) {
+      setQueueOpen(false);
+      window.scrollTo(0, 0);
+    }
+  };
+  const collapsed = narrow && Boolean(current);
+
+  const queue = [
+    h(IntakeForm, { key: "add", config, onCreated: async (c) => { await refresh(); pick(c.id); setFilter("open"); } }),
+    collapsed ? null : h("h3", { key: "h" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
+    h("input", { key: "q", className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
+    h("div", { key: "f", className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
+    h("ul", { key: "l", className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => pick(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
+    shown.length ? h("p", { key: "n", className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { key: "n", className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
+    config.sweeps ? h(SweepLine, { key: "s", onOpen: () => setTab("sweeps") }) : null,
+    h("p", { key: "i", className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
+  ];
 
   return h(
     "div",
@@ -968,24 +1128,21 @@ function App() {
       h("span", { className: "me" }, h("b", null, me.name), me.source === "platform-sign-in" ? null : h("span", { className: "pill", title: "No platform sign-in in front of this desk; the name comes from a local setting" }, "demo sign-in")),
     ),
     tab === "sweeps" && config.sweeps
-      ? h("div", { className: "columns" }, h("div", { className: "col wide narrowpage" }, h(Sweeps, { config, onOpened: async (c) => { await refresh(); setSelected(c.id); setFilter("all"); setTab("desk"); } })))
+      ? h("div", { className: "columns" }, h("div", { className: "col wide narrowpage" }, h(Sweeps, { config, onOpened: async (c) => { await refresh(); pick(c.id); setFilter("all"); setTab("desk"); } })))
       : tab === "register"
-      ? h("div", { className: "columns" }, h(Register, { config, onOpen: (id) => { setSelected(id); setFilter("all"); setTab("desk"); } }))
+      ? h("div", { className: "columns" }, h(Register, { config, onOpen: (id) => { pick(id); setFilter("all"); setTab("desk"); } }))
       : h(
           "div",
           { className: `columns ${config.case && config.case.showText ? "two" : ""}` },
-          h(
-            "div",
-            { className: "col list" },
-            h(IntakeForm, { config, onCreated: async (c) => { await refresh(); setSelected(c.id); setFilter("open"); } }),
-            h("h3", null, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)),
-            h("input", { className: "search", type: "search", placeholder: (config.case && config.case.searchPlaceholder) || "Search by title, regulator or subject", value: search, onChange: (e) => setSearch(e.target.value) }),
-            h("div", { className: "filters", role: "tablist" }, filters.filter((f) => always.includes(f.id) || counts[f.id] || f.id === filter).map((f) => h("button", { key: f.id, className: f.id === filter ? "on" : "", onClick: () => setFilter(f.id) }, f.label, h("b", null, counts[f.id])))),
-            h("ul", { className: `caselist ${config.case && config.case.listTitleLines === 2 ? "two-line" : ""}` }, shown.map((c) => h("li", { key: c.id, className: c.id === selected ? "on" : "", onClick: () => setSelected(c.id) }, h("div", { className: "t" }, c.fields.title), h("div", { className: "s" }, h("span", null, listFields.map((key) => show(config, key, c.fields[key])).filter(Boolean).join(" · ")), h(DueChip, { config, c }), h(Chip, { config, status: c.status }))))),
-            shown.length ? h("p", { className: "small" }, q ? `${shown.length} found in all ${config.desk.caseNounPlural}, open and closed` : `${shown.length} of ${list.length}`) : h("p", { className: "small" }, list.length ? "Nothing matches." : `No ${config.desk.caseNounPlural} yet.`),
-            config.sweeps ? h(SweepLine, { onOpen: () => setTab("sweeps") }) : null,
-            h("p", { className: "invented" }, (config.case && config.case.demoNote) || "Demo data: the bank, its policies and its officers are invented. The two publications are real."),
-          ),
+          // On a narrow screen, with a case open, the queue is one row that names it and opens on a tap.
+          collapsed
+            ? h(
+                "details",
+                { className: "col list queue", open: queueOpen, onToggle: (e) => setQueueOpen(e.currentTarget.open) },
+                h("summary", { className: "queue-summary" }, h("span", { className: "queue-name" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)), h("span", { className: "queue-count" }, shown.length), h("span", { className: "queue-filter" }, q ? "found" : active.label)),
+                h("div", { className: "queue-body" }, queue),
+              )
+            : h("div", { className: "col list" }, queue),
           current ? h(CaseView, { key: current.id, config, me, c: current, refresh }) : h("div", { className: "col blank" }, h("div", { className: "emptystate" }, h(Icon, { name: "inbox" }), h("p", null, list.length ? `Pick a ${config.desk.caseNoun} on the left.` : `No ${config.desk.caseNounPlural} on the desk yet.`), h("p", { className: "small" }, list.length ? "Its details and the agent's review open here." : `${config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`}, or wait for one to arrive.`))),
         ),
   );
