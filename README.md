@@ -170,6 +170,44 @@ its replies come from `demo-replies.json`.
 - `draft.plainSource`: set `true` when the first column of a row ("Required by") holds a sentence and not a clause number, so it is not set in monospace.
 - `intake.fields[].options`: a list of values. The form shows a list to choose from instead of a text box.
 
+**Decisions and marks for each kind of work.** With `routing`, a kind can name which decisions its cases offer and which marks they use:
+
+```json
+"routing": {
+  "field": "kind",
+  "kinds": {
+    "Credit analysis": {
+      "agentEnv": "CREDIT_AGENT_ID",
+      "instruction": "...",
+      "decisions": ["approve", "refer", "send_back"],
+      "marks": ["in order", "outside policy", "missing", "differs"]
+    }
+  }
+}
+```
+
+`decisions` is a list of decision ids. A case of that kind shows only those buttons, and the server refuses any other decision with a message (HTTP 409). `marks` is a list of mark names. The count above the rows lists those marks, with a zero where none was given. A mark that the agent gave outside the list is still counted. A kind with no list, a kind that is not named, and a desk with no `routing` show every decision and every mark.
+
+**A place for a long piece of writing.** Add objects to `draft.sections`, after the plain names the list may already hold:
+
+```json
+"sections": [
+  "Summary",
+  "Draft review",
+  { "heading": "Draft response to the customer. Not sent.", "title": "Draft response to the customer", "hint": "Not sent." }
+]
+```
+
+When the agent's reply has a line that is exactly `heading`, after the table, the text under it (up to the next section heading or the proposal line) is shown as a card below the rows, under `title`, with `hint` as a small line under the title. The card is set in the serif face, with paragraphs and line breaks kept. Nothing is read as HTML. Entries that are plain strings keep their old meaning (the names of the agent's own headings) and make no card. A reply without the heading shows no card. "Edit the text" gives each section its own box, and the whole text one step further. Every version is kept, and the issued document carries the text as approved, with each heading line written as a `##` title. The stand-in returns such text from `demo-replies.json` as it is; the file's format does not change.
+
+**Small page settings** (all optional):
+
+- `draft.rowLabels.check`: the label of the last line of a row. Default "Check".
+- `due.workingDays`: `true` counts `standardDays` and `expeditedDays` as working days, Monday to Friday, with no holidays. Without it they are calendar days.
+- Names: in "What happened", the waiting notice and the other notices, a person is shown by name where the desk can derive it (the signed-in person, the person who entered the case, or `first.last@...` read as "First Last"). The address stays as the element's title. The register and the export keep the address.
+- A record id such as `DOC-8203` or `LD-20261123-6A10E8`, and a date such as `2026-11-19`, never breaks across lines. Figures in rows line up.
+- On a screen narrower than 1100 px, with a case open, the queue is one row that names it and shows the count. A tap opens it.
+
 ## What is real and what is a stand-in
 
 | Piece | State |
@@ -220,6 +258,7 @@ desk.css             the look
 desk.config.json     what makes this desk the regulatory change desk
 lib/cases.js         the rules: intake, four eyes, decisions, the register entry, the issued document
 lib/agent.js         the Katonic agent API, streamed and assembled
+lib/page-shared.js   rules the server and the page share: named sections, display names
 lib/identity.js      who is signed in, and whether the headers are believed
 lib/store.js         records: a JSON file, or PostgreSQL when DATABASE_URL is set
 demo/                the two publications, the invented bank's policies, the seed, the stand-in agent API

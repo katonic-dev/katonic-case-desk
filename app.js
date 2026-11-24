@@ -140,12 +140,12 @@ function DueChip({ config, c }) {
   return h("span", { className: `due ${due.tone}` }, h(Icon, { name: "clock" }), due.text);
 }
 
-// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) is kept whole: it is
+// A record id (DOC-8203, MTB-POL-031, LD-20261123-6A10E8) or a date (2026-11-19) is kept whole: it is
 // wrapped, not changed, so a copied id is the id. Returns the text itself when
 // it holds no id.
 function withIds(text, key = "i") {
   const s = String(text == null ? "" : text);
-  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b/g;
+  const re = /\b[A-Z]{2,}(?:-[A-Z0-9]+)+\b|\b\d{4}-\d{2}-\d{2}\b/g;
   const out = [];
   let last = 0;
   let m;
@@ -853,7 +853,7 @@ function CaseView({ config, me, c, refresh }) {
 
   const review = [
     // The summary earns its place only where there is no table to read.
-    latest && c.summary && !rows ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, c.summary)) : null,
+    latest && c.summary && !rows ? h("div", { key: "sum", className: "card" }, h("p", { className: "summary" }, withIds(c.summary, "su"))) : null,
     latest
       ? editing && open
         ? sections.length
@@ -870,6 +870,7 @@ function CaseView({ config, me, c, refresh }) {
                   h("textarea", {
                     id,
                     className: "draft prose-edit",
+                    rows: Math.min(28, Math.max(6, String(typed[s.heading] != null ? typed[s.heading] : now ? now.text : "").split("\n").reduce((n, l) => n + Math.ceil((l.length || 1) / 64), 1))),
                     value: typed[s.heading] != null ? typed[s.heading] : now ? now.text : "",
                     onChange: (e) => {
                       setTyped({ ...typed, [s.heading]: e.target.value });
@@ -1134,15 +1135,14 @@ function App() {
       : h(
           "div",
           { className: `columns ${config.case && config.case.showText ? "two" : ""}` },
-          // On a narrow screen, with a case open, the queue is one row that names it and opens on a tap.
-          collapsed
-            ? h(
-                "details",
-                { className: "col list queue", open: queueOpen, onToggle: (e) => setQueueOpen(e.currentTarget.open) },
-                h("summary", { className: "queue-summary" }, h("span", { className: "queue-name" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)), h("span", { className: "queue-count" }, shown.length), h("span", { className: "queue-filter" }, q ? "found" : active.label)),
-                h("div", { className: "queue-body" }, queue),
-              )
-            : h("div", { className: "col list" }, queue),
+          // One tree on every width, so a form that is open survives a resize. On a narrow screen,
+          // with a case open, the queue is one row that names it and opens on a tap; elsewhere it is open and its row is hidden.
+          h(
+            "details",
+            { className: `col list queue ${current ? "" : "solo"}`, open: !collapsed || queueOpen, onToggle: (e) => { if (collapsed) setQueueOpen(e.currentTarget.open); } },
+            h("summary", { className: "queue-summary" }, h("span", { className: "queue-name" }, config.desk.caseNounPlural[0].toUpperCase() + config.desk.caseNounPlural.slice(1)), h("span", { className: "queue-count" }, shown.length), h("span", { className: "queue-filter" }, q ? "found" : active.label)),
+            h("div", { className: "queue-body" }, queue),
+          ),
           current ? h(CaseView, { key: current.id, config, me, c: current, refresh }) : h("div", { className: "col blank" }, h("div", { className: "emptystate" }, h(Icon, { name: "inbox" }), h("p", null, list.length ? `Pick a ${config.desk.caseNoun} on the left.` : `No ${config.desk.caseNounPlural} on the desk yet.`), h("p", { className: "small" }, list.length ? "Its details and the agent's review open here." : `${config.desk.addLabel || `Drop a ${config.desk.caseNoun} in`}, or wait for one to arrive.`))),
         ),
   );

@@ -547,7 +547,7 @@ h3 > * { white-space: nowrap; }
 .editsec { margin-top: 14px; }
 .editsec:first-child { margin-top: 0; }
 .editsec .prose-title { display: block; }
-textarea.draft.prose-edit { display: block; min-height: 220px; margin-top: 6px; line-height: 1.6; }
+textarea.draft.prose-edit { display: block; min-height: 120px; margin-top: 6px; line-height: 1.6; }
 .editwhole { margin-top: 14px; }
 .editwhole textarea.draft { margin-top: 8px; }
 @media (max-width: 600px) {
@@ -562,9 +562,20 @@ textarea.draft.prose-edit { display: block; min-height: 220px; margin-top: 6px; 
 .queue-summary::after { content: ""; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--t3); border-bottom: 2px solid var(--t3); transform: rotate(45deg) translateY(-2px); flex: none; }
 .queue[open] > .queue-summary::after { transform: rotate(-135deg) translateY(-2px); }
 .queue[open] > .queue-summary { border-bottom: 1px solid var(--line); }
-.queue-body { padding: 14px 16px 24px; }
+.queue-body { padding: 0; }
 .queue-name { font-weight: 600; }
 .queue-count { font-size: var(--fs-sm); padding: 1px 9px; border-radius: 999px; background: var(--rule); color: var(--t2); font-variant-numeric: tabular-nums; }
 .queue-filter { font-size: var(--fs-sm); color: var(--t4); }
 .col.list.queue { padding: 0; }
 .queue-summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; box-shadow: none; }
+
+/* The queue is one tree on every width: its row shows only on a narrow screen with a case open. */
+.queue-summary { display: none; }
+.col.list.queue { padding: 14px 14px 24px; }
+.queue-body { padding: 0; }
+@media (max-width: 1100px) {
+  .col.list.queue { padding: 0; }
+  .queue:not(.solo) > .queue-summary { display: flex; }
+  .queue-body { padding: 14px 16px 24px; }
+  .queue:not([open]) > .queue-body { display: none; }
+}

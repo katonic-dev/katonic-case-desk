@@ -284,7 +284,7 @@ test("display names: read from the address where they can be, else the address; 
 test("record ids are wrapped whole, the characters unchanged", () => {
   const out = sandbox.withIds("See DOC-8203 and MTB-POL-031, then LAP-8002; LD-20261123-6A10E8 is new. Not 2026-11-23 or e-mail.", "t");
   const ids = out.filter((x) => typeof x === "object").map(textOf);
-  assert.deepEqual(Array.from(ids), ["DOC-8203", "MTB-POL-031", "LAP-8002", "LD-20261123-6A10E8"]);
+  assert.deepEqual(Array.from(ids), ["DOC-8203", "MTB-POL-031", "LAP-8002", "LD-20261123-6A10E8", "2026-11-23"]);
   assert.ok(out.filter((x) => typeof x === "object").every((n) => n.props.className === "id"));
   assert.equal(out.map(textOf).join(""), "See DOC-8203 and MTB-POL-031, then LAP-8002; LD-20261123-6A10E8 is new. Not 2026-11-23 or e-mail.", "a copy reads the same");
   assert.equal(sandbox.withIds("nothing here", "t"), "nothing here");
