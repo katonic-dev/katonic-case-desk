@@ -674,3 +674,31 @@ table.register td.c-customer, table.register td.c-entry, table.register th.c-cus
   .gap:has(.cline) .gaprow .kv .k { padding-top: 8px; }
   .gaprow .cline .clabel { flex-basis: 64px; }
 }
+
+/* A decision the agent carries out: the case's four statuses, and the card with what the bank's systems returned. */
+.chip.act-working { background: var(--brand-l); color: var(--brand); }
+.chip.act-waiting { background: var(--warn-l); color: var(--warn); }
+.chip.act-failed { background: var(--err-l); color: var(--err); }
+.chip.act-done { background: var(--ok-l); color: var(--ok); }
+.outcome-card { margin: 18px 0 0; padding: 14px 18px 16px; border-left: 4px solid var(--line); }
+.outcome-card.state-working { border-left-color: var(--brand); }
+.outcome-card.state-waiting { border-left-color: var(--warn); }
+.outcome-card.state-failed { border-left-color: var(--err); }
+.outcome-card.state-done { border-left-color: var(--ok); }
+.outcome-card .prose-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.outcome-card .notice { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; }
+.outcome-card .notice .dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--brand); animation: pulse 1s ease-in-out infinite; }
+.outcome-card .notice.cause { display: block; }
+.outcome-card .answer { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.outcome-card .answer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: var(--fs-sm); color: var(--t4); }
+.outcome-card .answer-head time { font-weight: 600; color: var(--t2); }
+.outcome-card .answer-head .earlier { margin-left: auto; }
+.outcome-card .answer .prose { margin-top: 6px; padding-top: 0; border-top: 0; max-width: 68ch; }
+.outcome-card .answer .prose ul { margin: 0 0 0.8em; padding-left: 1.25em; }
+.outcome-card .answer .prose li { margin: 0 0 0.4em; }
+.outcome-card .answer.older .prose { color: var(--t3); }
+.outcome-card .outcome-actions { margin-top: 14px; }
+@media (max-width: 600px) {
+  .outcome-card { padding: 12px 14px 14px; }
+  .outcome-card .answer-head .earlier { margin-left: 0; }
+}

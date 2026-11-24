@@ -34,8 +34,27 @@ function fmt(iso) {
 
 const OPEN_STATUSES = ["new", "drafting", "for_review", "sent_back"];
 
+// A decision with an act (decisions[].act) sends the agent what was confirmed.
+// The case then holds one of four statuses: carrying out, waiting for the
+// outcome, not carried out, or done. The server fills in the names (see withActs).
+function actStatuses(config) {
+  const out = { working: "acting", done: [], waiting: [], failed: [] };
+  for (const d of config.decisions || []) {
+    if (!d.act) continue;
+    for (const [k, id] of [["done", d.act.doneStatus], ["waiting", d.act.waitingStatus], ["failed", d.act.failedStatus]]) if (id && !out[k].includes(id)) out[k].push(id);
+  }
+  return out;
+}
+
+// "working", "waiting", "failed", "done", or "" for a status that is none of them.
+function actStateOf(config, status) {
+  const a = actStatuses(config);
+  return status === a.working ? "working" : a.waiting.includes(status) ? "waiting" : a.failed.includes(status) ? "failed" : a.done.includes(status) ? "done" : "";
+}
+
 function Chip({ config, status }) {
-  return h("span", { className: `chip ${status}` }, status === "drafting" ? h("span", { className: "dot" }) : null, config.statuses[status] || status);
+  const state = actStateOf(config, status);
+  return h("span", { className: `chip ${status}${state ? ` act-${state}` : ""}` }, status === "drafting" || state === "working" ? h("span", { className: "dot" }) : null, config.statuses[status] || status);
 }
 
 function hostOf(link) {
@@ -532,6 +551,86 @@ function CaseText({ text }) {
   );
 }
 
+// What the agent returned, typeset for reading. Paragraphs split at blank lines;
+// a line that starts with a dash is a list item; **bold** is bold; nothing is read as HTML.
+function OutcomeText({ text }) {
+  const body = String(text || "").replace(/^\s*\[Stand-in agent[^\]]*\]\s*/, "").replace(/\r/g, "");
+  const blocks = body.split(/\n{2,}/).map((b) => b.split("\n").filter((l) => l.trim())).filter((b) => b.length);
+  return blocks.map((lines, i) => {
+    const item = (l) => /^\s*[-*]\s+/.test(l);
+    const out = [];
+    let run = [];
+    const flush = () => {
+      if (run.length) out.push(h("ul", { key: `u${out.length}` }, run.map((l, j) => h("li", { key: j }, richIds(l.replace(/^\s*[-*]\s+/, ""), `${i}-${j}`)))));
+      run = [];
+    };
+    lines.forEach((l, j) => {
+      if (item(l)) run.push(l);
+      else {
+        flush();
+        out.push(h("p", { key: `p${out.length}` }, richIds(l, `${i}-${j}`)));
+      }
+    });
+    flush();
+    return h(React.Fragment, { key: i }, out);
+  });
+}
+
+// A line with **bold** and `code`, and with each id, date and amount kept whole.
+function richIds(text, key) {
+  return String(text).split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g).map((p, i) => {
+    if (p.length > 4 && p.startsWith("**") && p.endsWith("**")) return h("strong", { key: `${key}-${i}` }, withIds(p.slice(2, -2), `${key}b${i}`));
+    if (p.length > 2 && p.startsWith("`") && p.endsWith("`")) return h("code", { key: `${key}-${i}` }, p.slice(1, -1));
+    return h(React.Fragment, { key: `${key}-${i}` }, withIds(p, `${key}p${i}`));
+  });
+}
+
+// The outcome of a case whose decision the agent carries out: what the bank's systems returned,
+// in its own card, with the one button the state calls for.
+function OutcomeCard({ config, me, c, refresh }) {
+  const o = c.outcome;
+  const d = config.decisions.find((x) => x.id === o.decision) || {};
+  const act = d.act || {};
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  async function go(step) {
+    setBusy(true);
+    setErr("");
+    try {
+      await api(`/api/cases/${c.id}/outcome/${step}`, { method: "POST", body: "{}" });
+      await refresh();
+    } catch (ex) {
+      setErr(ex.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const standIn = o.answers.some((a) => /^\[Stand-in agent/.test(a.text));
+  const stepWords = { act: "Confirmed by", again: "Asked again by", retry: "Sent again by" };
+  const note = { working: act.workingNote || "The agent is carrying out what was confirmed. This page refreshes on its own.", waiting: act.waitingNote, done: act.doneNote, failed: act.failedNote || "The agent did not carry this out, and your confirmation is recorded. Nothing is lost. Press the button to send the same request again: the agent reads the current state first, so nothing is done twice." }[o.state];
+  return h(
+    "section",
+    { className: `card outcome-card state-${o.state}`, "aria-label": act.title },
+    h("div", { className: "prose-title" }, act.title),
+    h("div", { className: "prose-hint" }, "Sent to the agent by ", h(Named, { me, c, email: o.by }), `, ${fmt(o.started_at)}`, standIn ? h("span", { className: "tag", title: "No real agent wrote this. The stand-in platform returns canned text so the screen can be seen." }, "stand-in agent, canned text") : null),
+    note ? h("div", { className: `notice ${o.state === "failed" ? "bad" : o.state === "working" ? "plain" : o.state === "done" ? "ok" : ""}`, role: "status" }, o.state === "working" ? h("span", { className: "dot" }) : null, note) : null,
+    o.state === "failed" && o.error ? h("div", { className: "notice bad cause" }, h("b", null, "What the agent said: "), withIds(o.error.message, "oe")) : null,
+    o.state !== "failed" && o.error ? h("div", { className: "notice bad cause" }, h("b", null, "The last question failed: "), withIds(o.error.message, "oe"), " Nothing was undone. Ask again.") : null,
+    o.answers.map((a, i) =>
+      h(
+        "div",
+        { key: a.at + i, className: `answer${i ? " older" : ""}` },
+        h("div", { className: "answer-head" }, h("time", null, fmt(a.at)), h("span", null, stepWords[a.step] || "Answer", " ", h(Named, { me, c, email: a.by })), i ? h("span", { className: "earlier" }, "earlier answer") : null),
+        h("div", { className: "prose" }, h(OutcomeText, { text: a.text })),
+      ),
+    ),
+    o.state === "waiting" || o.state === "failed"
+      ? h("div", { className: "row outcome-actions" }, h("button", { className: `btn ${o.state === "failed" ? "primary" : ""}`, disabled: busy, onClick: () => go(o.state === "failed" ? "retry" : "again") }, busy ? "Asking..." : o.state === "failed" ? act.retryLabel || "Try again" : act.askAgainLabel || "Ask for the outcome again"))
+      : null,
+    err ? h("div", { className: "notice bad" }, err) : null,
+  );
+}
+
 // The decision whose proposalPrefix the agent's recommendation starts with (the longest wins).
 function proposedDecision(config, text) {
   const t = String(text || "").trim().toLowerCase();
@@ -714,7 +813,7 @@ function CaseView({ config, me, c, refresh }) {
           "div",
           { className: "titlerow" },
           h("h2", null, withIds(c.fields.title, "title")),
-          closed
+          closed || c.outcome
             ? null
             : h(
                 "details",
@@ -805,7 +904,7 @@ function CaseView({ config, me, c, refresh }) {
         "div",
         { className: "actions" },
         approve
-          ? h("button", { className: `btn ${leanApprove ? "primary" : choice === approve.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => (approveNeedsReason ? setChoice(choice === approve.id ? "" : approve.id) : decide(approve)) }, busy === approve.id ? "Recording..." : approve.label, tag(approve))
+          ? h("button", { className: `btn ${approve.act && choice === approve.id ? "chosen" : leanApprove ? "primary" : choice === approve.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => (approveNeedsReason || approve.act ? setChoice(choice === approve.id ? "" : approve.id) : decide(approve)) }, busy === approve.id ? "Recording..." : approve.label, tag(approve))
           : null,
         others.map((d) =>
           h("button", { key: d.id, className: `btn ${choice === d.id ? "chosen" : "outline"}`, disabled: Boolean(busy) || fourEyesBlocked || !latest, onClick: () => setChoice(choice === d.id ? "" : d.id) }, d.label, tag(d)),
@@ -818,9 +917,9 @@ function CaseView({ config, me, c, refresh }) {
         ? h(
             "form",
             { className: "form", onSubmit: (e) => { e.preventDefault(); decide(chosen); } },
-            h("label", { htmlFor: "decision-note" }, approve && chosen.id === approve.id ? config.rules.reasonToApproveUnmetLabel || "Why you are approving although a row is not met" : noteLabel(chosen), h("textarea", { id: "decision-note", value: note, autoFocus: true, onChange: (e) => setNote(e.target.value) })),
+            h("label", { htmlFor: "decision-note" }, approve && chosen.id === approve.id && !chosen.act ? config.rules.reasonToApproveUnmetLabel || "Why you are approving although a row is not met" : noteLabel(chosen), h("textarea", { id: "decision-note", value: note, autoFocus: true, onChange: (e) => setNote(e.target.value) })),
             chosen.noteHint ? h("p", { className: "small" }, chosen.noteHint) : null,
-            h("div", { className: "row" }, h("button", { className: "btn primary", type: "submit", disabled: Boolean(busy) || !note.trim() }, busy === chosen.id ? "Recording..." : chosen.label), h("button", { className: "btn quiet", type: "button", onClick: () => setChoice("") }, "Cancel")),
+            h("div", { className: "row" }, h("button", { className: "btn primary", type: "submit", disabled: Boolean(busy) || (!note.trim() && !(chosen.act && chosen.needsNote === false)) }, busy === chosen.id ? "Recording..." : chosen.label), h("button", { className: "btn quiet", type: "button", onClick: () => setChoice("") }, "Cancel")),
           )
         : null,
       h(
@@ -988,7 +1087,10 @@ function CaseView({ config, me, c, refresh }) {
     })),
   ];
 
-  const chat = closed
+  // What the bank's systems returned, once the agent has been sent what was confirmed.
+  const outcome = c.outcome ? h(OutcomeCard, { key: "outcome", config, me, c, refresh }) : null;
+
+  const chat = closed || c.outcome
     ? null
     : [
         h("h3", { key: "h" }, "Ask the agent about this one"),
@@ -1024,11 +1126,11 @@ function CaseView({ config, me, c, refresh }) {
             )
           : [supplied, chat],
       ),
-      h("div", { key: "review", id: "pane-assessment", className: "col review" }, notices, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
+      h("div", { key: "review", id: "pane-assessment", className: "col review" }, notices, outcome, reviewHead, verdict || h("div", { className: "verdict plain" }, decision), review, history),
     ];
   }
   return [
-    h("div", { key: "middle", className: "col" }, header, notices, reviewHead, verdict, review, history),
+    h("div", { key: "middle", className: "col" }, header, notices, outcome, reviewHead, verdict, review, history),
     h("div", { key: "right", className: "col" }, h("h3", null, "Decision"), decision, chat),
   ];
 }
@@ -1143,20 +1245,21 @@ function App() {
   }, []);
   // While anything is drafting, poll.
   React.useEffect(() => {
-    if (!list.some((c) => c.status === "drafting")) return undefined;
+    if (!list.some((c) => c.status === "drafting" || actStateOf(config || {}, c.status) === "working")) return undefined;
     const t = setInterval(() => refresh().catch(() => {}), 2500);
     return () => clearInterval(t);
-  }, [list]);
+  }, [list, config]);
 
   if (!config || !me) return h("p", { style: { padding: 20 } }, "Loading...");
   const current = list.find((c) => c.id === selected);
 
   const filters = [
-    { id: "open", label: "Open", test: (c) => OPEN_STATUSES.includes(c.status) || waitingStatuses(config).includes(c.status) },
+    { id: "open", label: "Open", test: (c) => OPEN_STATUSES.includes(c.status) || waitingStatuses(config).includes(c.status) || ["working", "waiting", "failed"].includes(actStateOf(config, c.status)) },
     { id: "mine", label: "Mine to decide", test: (c) => c.status === "for_review" && !(config.rules.fourEyes && c.requested_by.source !== "system" && c.requested_by.email === me.email) },
     { id: "for_review", label: config.statuses.for_review, test: (c) => c.status === "for_review" },
     { id: "sent_back", label: config.statuses.sent_back, test: (c) => c.status === "sent_back" },
     ...waitingStatuses(config).map((s) => ({ id: s, label: (config.filterLabels || {})[s] || config.statuses[s] || s, test: (c) => c.status === s })),
+    ...actStatuses(config).waiting.concat(actStatuses(config).failed).map((s) => ({ id: s, label: (config.filterLabels || {})[s] || config.statuses[s] || s, test: (c) => c.status === s })),
     { id: "closed", label: "Closed", test: (c) => closedStatuses(config).includes(c.status) && c.status !== "removed" },
     { id: "all", label: "All", test: () => true },
   ];
